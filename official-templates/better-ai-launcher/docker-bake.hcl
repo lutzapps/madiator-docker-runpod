@@ -12,5 +12,5 @@ target "better-ai-launcher" {
         proxy = "../../container-template/proxy"
         logo = "../../container-template"
     }
-    tags = ["madiator2011/better-launcher:latest"]
+    tags = ["madiator2011/better-launcher:dev"]
 }

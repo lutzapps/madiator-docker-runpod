@@ -10,6 +10,7 @@ import traceback
 from tqdm import tqdm
 import xml.etree.ElementTree as ET
 import time
+import shutil
 
 INSTALL_STATUS_FILE = '/tmp/install_status.json'
 
@@ -251,7 +252,7 @@ def download_and_unpack_venv(app_name, app_configs, send_websocket_message):
         # Clean up the downloaded file
         send_websocket_message('install_log', {'app_name': app_name, 'log': 'Cleaning up...'})
         os.remove(downloaded_file)
-        send_websocket_message('install_log', {'app_name': app_name, 'log': 'Installation complete.'})
+        send_websocket_message('install_log', {'app_name': app_name, 'log': 'Installation complete. Refresh page to start app'})
 
         save_install_status(app_name, 'completed', 100, 'Completed')
         send_websocket_message('install_complete', {'app_name': app_name, 'status': 'success', 'message': "Virtual environment installed successfully."})
@@ -291,3 +292,50 @@ def fix_custom_nodes(app_name, app_configs):
             return False, f"Error fixing custom nodes. Output: {output.decode('utf-8')}"
     except Exception as e:
         return False, f"Error fixing custom nodes: {str(e)}"
+
+# Replace the existing install_app function with this updated version
+def install_app(app_name, app_configs, send_websocket_message):
+    if app_name in app_configs:
+        return download_and_unpack_venv(app_name, app_configs, send_websocket_message)
+    else:
+        return False, f"Unknown app: {app_name}"
+
+def update_model_symlinks():
+    shared_models_dir = '/workspace/shared_models'
+    apps = {
+        'stable-diffusion-webui': '/workspace/stable-diffusion-webui/models',
+        'stable-diffusion-webui-forge': '/workspace/stable-diffusion-webui-forge/models',
+        'ComfyUI': '/workspace/ComfyUI/models'
+    }
+    model_types = ['Stable-diffusion', 'VAE', 'Lora', 'ESRGAN']
+
+    for model_type in model_types:
+        shared_model_path = os.path.join(shared_models_dir, model_type)
+        
+        if not os.path.exists(shared_model_path):
+            continue
+
+        for app, app_models_dir in apps.items():
+            if app == 'ComfyUI':
+                if model_type == 'Stable-diffusion':
+                    app_model_path = os.path.join(app_models_dir, 'checkpoints')
+                elif model_type == 'Lora':
+                    app_model_path = os.path.join(app_models_dir, 'loras')
+                elif model_type == 'ESRGAN':
+                    app_model_path = os.path.join(app_models_dir, 'upscale_models')
+                else:
+                    app_model_path = os.path.join(app_models_dir, model_type.lower())
+            else:
+                app_model_path = os.path.join(app_models_dir, model_type)
+            
+            # Create the app model directory if it doesn't exist
+            os.makedirs(app_model_path, exist_ok=True)
+
+            # Create symlinks for each file in the shared model directory
+            for filename in os.listdir(shared_model_path):
+                src = os.path.join(shared_model_path, filename)
+                dst = os.path.join(app_model_path, filename)
+                if os.path.isfile(src) and not os.path.exists(dst):
+                    os.symlink(src, dst)
+
+    print("Model symlinks updated.")

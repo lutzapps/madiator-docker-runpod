@@ -10,3 +10,4 @@ tqdm
 cryptography
 pexpect
 zstandard
+huggingface_hub[cli]

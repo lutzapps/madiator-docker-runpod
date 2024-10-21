@@ -7,7 +7,7 @@ filebrowser_process = None
 def configure_filebrowser():
     try:
         subprocess.run('filebrowser config init', shell=True, check=True)
-        subprocess.run('filebrowser config set --auth.method=json', shell=True, check=True)
+        subprocess.run('filebrowser config set --auth.method=noauth', shell=True, check=True)
         subprocess.run('filebrowser config set --baseurl /fileapp', shell=True, check=True)
         subprocess.run('filebrowser config set --root /workspace', shell=True, check=True)
         subprocess.run('filebrowser users add admin admin', shell=True, check=True)

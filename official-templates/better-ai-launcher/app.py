@@ -17,10 +17,11 @@ from utils.filebrowser_utils import configure_filebrowser, start_filebrowser, st
 from utils.app_utils import (
     run_app, update_process_status, check_app_directories, get_app_status,
     force_kill_process_by_name, update_webui_user_sh, save_install_status,
-    get_install_status, download_and_unpack_venv, fix_custom_nodes, is_process_running,
+    get_install_status, download_and_unpack_venv, fix_custom_nodes, is_process_running, install_app, update_model_symlinks
 )
 from utils.websocket_utils import send_websocket_message, active_websockets
-from utils.app_configs import get_app_configs, add_app_config, remove_app_config
+from utils.app_configs import get_app_configs, add_app_config, remove_app_config, app_configs
+from utils.model_utils import download_model, check_civitai_url, check_huggingface_url, SHARED_MODELS_DIR, format_size
 
 app = Flask(__name__)
 sock = Sock(app)
@@ -34,6 +35,8 @@ app_configs = get_app_configs()
 S3_BASE_URL = "https://better.s3.madiator.com/"
 
 SETTINGS_FILE = '/workspace/.app_settings.json'
+
+CIVITAI_TOKEN_FILE = '/workspace/.civitai_token'
 
 def load_settings():
     if os.path.exists(SETTINGS_FILE):
@@ -182,17 +185,29 @@ def websocket(ws):
         active_websockets.remove(ws)
 
 def send_heartbeat():
+    initial_interval = 5  # 5 seconds
+    max_interval = 60  # 60 seconds
+    current_interval = initial_interval
+    start_time = time.time()
+
     while True:
-        time.sleep(60)  # Send heartbeat every 60 seconds (1 minute)
+        time.sleep(current_interval)
         send_websocket_message('heartbeat', {})
+        
+        # Gradually increase the interval
+        elapsed_time = time.time() - start_time
+        if elapsed_time < 60:  # First minute
+            current_interval = min(current_interval * 1.5, max_interval)
+        else:
+            current_interval = max_interval
 
 # Start heartbeat thread
 threading.Thread(target=send_heartbeat, daemon=True).start()
 
 @app.route('/install/<app_name>', methods=['POST'])
-def install_app(app_name):
+def install_app_route(app_name):
     try:
-        success, message = download_and_unpack_venv(app_name)
+        success, message = install_app(app_name, app_configs, send_websocket_message)
         if success:
             return jsonify({'status': 'success', 'message': message})
         else:
@@ -418,7 +433,7 @@ def recreate_symlinks_route():
 def create_shared_folders():
     try:
         shared_models_dir = '/workspace/shared_models'
-        model_types = ['Stable-diffusion', 'VAE', 'Lora', 'ESRGAN']
+        model_types = ['Stable-diffusion', 'Lora', 'embeddings', 'VAE', 'hypernetworks', 'aesthetic_embeddings', 'controlnet', 'ESRGAN']
 
         # Create shared models directory if it doesn't exist
         os.makedirs(shared_models_dir, exist_ok=True)
@@ -434,15 +449,102 @@ def create_shared_folders():
         if not os.path.exists(readme_path):
             with open(readme_path, 'w') as f:
                 f.write("Upload your models to the appropriate folders:\n\n")
-                f.write("- Stable-diffusion: for Stable Diffusion models\n")
-                f.write("- VAE: for VAE models\n")
+                f.write("- Stable-diffusion: for Stable Diffusion checkpoints\n")
                 f.write("- Lora: for LoRA models\n")
+                f.write("- embeddings: for Textual Inversion embeddings\n")
+                f.write("- VAE: for VAE models\n")
+                f.write("- hypernetworks: for Hypernetwork models\n")
+                f.write("- aesthetic_embeddings: for Aesthetic Gradient embeddings\n")
+                f.write("- controlnet: for ControlNet models\n")
                 f.write("- ESRGAN: for ESRGAN upscaling models\n\n")
                 f.write("These models will be automatically linked to all supported apps.")
 
         return jsonify({'status': 'success', 'message': 'Shared model folders created successfully.'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
+
+def save_civitai_token(token):
+    with open(CIVITAI_TOKEN_FILE, 'w') as f:
+        json.dump({'token': token}, f)
+
+def load_civitai_token():
+    if os.path.exists(CIVITAI_TOKEN_FILE):
+        with open(CIVITAI_TOKEN_FILE, 'r') as f:
+            data = json.load(f)
+            return data.get('token')
+    return None
+
+@app.route('/save_civitai_token', methods=['POST'])
+def save_civitai_token_route():
+    token = request.json.get('token')
+    if token:
+        save_civitai_token(token)
+        return jsonify({'status': 'success', 'message': 'Civitai token saved successfully.'})
+    return jsonify({'status': 'error', 'message': 'No token provided.'}), 400
+
+@app.route('/get_civitai_token', methods=['GET'])
+def get_civitai_token_route():
+    token = load_civitai_token()
+    return jsonify({'token': token})
+
+@app.route('/download_model', methods=['POST'])
+def download_model_route():
+    url = request.json.get('url')
+    model_name = request.json.get('model_name')
+    model_type = request.json.get('model_type')
+    civitai_token = request.json.get('civitai_token') or load_civitai_token()
+    hf_token = request.json.get('hf_token')
+    version_id = request.json.get('version_id')
+    file_index = request.json.get('file_index')
+
+    is_civitai, _, _, _ = check_civitai_url(url)
+    is_huggingface, _, _, _, _ = check_huggingface_url(url)
+
+    if not (is_civitai or is_huggingface):
+        return jsonify({'status': 'error', 'message': 'Unsupported URL. Please use Civitai or Hugging Face URLs.'}), 400
+
+    if is_civitai and not civitai_token:
+        return jsonify({'status': 'error', 'message': 'Civitai token is required for downloading from Civitai.'}), 400
+
+    try:
+        success, message = download_model(url, model_name, model_type, send_websocket_message, civitai_token, hf_token, version_id, file_index)
+        if success:
+            if isinstance(message, dict) and 'choice_required' in message:
+                return jsonify({'status': 'choice_required', 'data': message['choice_required']})
+            return jsonify({'status': 'success', 'message': message})
+        else:
+            return jsonify({'status': 'error', 'message': message}), 400
+    except Exception as e:
+        error_message = f"Model download error: {str(e)}\n{traceback.format_exc()}"
+        app.logger.error(error_message)
+        return jsonify({'status': 'error', 'message': error_message}), 500
+
+@app.route('/get_model_folders')
+def get_model_folders():
+    folders = {}
+    for folder in ['Stable-diffusion', 'VAE', 'Lora', 'ESRGAN']:
+        folder_path = os.path.join(SHARED_MODELS_DIR, folder)
+        if os.path.exists(folder_path):
+            total_size = 0
+            file_count = 0
+            for dirpath, dirnames, filenames in os.walk(folder_path):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    total_size += os.path.getsize(fp)
+                    file_count += 1
+            folders[folder] = {
+                'size': format_size(total_size),
+                'file_count': file_count
+            }
+    return jsonify(folders)
+
+@app.route('/update_symlinks', methods=['POST'])
+def update_symlinks_route():
+    try:
+        update_model_symlinks()
+        return jsonify({'status': 'success', 'message': 'Symlinks updated successfully'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
     shared_models_path = setup_shared_models()
