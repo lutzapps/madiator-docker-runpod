@@ -17,8 +17,44 @@ from utils.filebrowser_utils import configure_filebrowser, start_filebrowser, st
 from utils.app_utils import (
     run_app, update_process_status, check_app_directories, get_app_status,
     force_kill_process_by_name, update_webui_user_sh, save_install_status,
-    get_install_status, download_and_unpack_venv, fix_custom_nodes, is_process_running, install_app, update_model_symlinks
+    get_install_status, download_and_unpack_venv, fix_custom_nodes, is_process_running, install_app #, update_model_symlinks
 )
+# lutzapps - CHANGE #1
+LOCAL_DEBUG = os.environ.get('LOCAL_DEBUG', 'False') # support local browsing for development/debugging
+
+# use the new "utils.shared_models" module for app model sharing
+from utils.shared_models import (
+    update_model_symlinks, # main WORKER function (file/folder symlinks, Fix/remove broken symlinks, pull back local app models into shared)
+    SHARED_MODELS_DIR, SHARED_MODEL_FOLDERS, SHARED_MODEL_FOLDERS_FILE, ensure_shared_models_folders,
+    APP_INSTALL_DIRS, APP_INSTALL_DIRS_FILE, init_app_install_dirs, # APP_INSTALL_DIRS dict/file/function
+    MAP_APPS, sync_with_app_configs_install_dirs, # internal MAP_APPS dict and sync function
+    SHARED_MODEL_APP_MAP, SHARED_MODEL_APP_MAP_FILE, init_shared_model_app_map, # SHARED_MODEL_APP_MAP dict/file/function
+    write_dict_to_jsonfile, read_dict_from_jsonfile, PrettyDICT # JSON helper functions
+)
+# the "update_model_symlinks()" function replaces the app.py function with the same same
+# and redirects to same function name "update_model_symlinks()" in the new "utils.shared_models" module
+#
+# this function does ALL the link management, including deleting "stale" symlinks,
+# so the "recreate_symlinks()" function will be also re-routed to the
+# "utils.shared_models.update_model_symlinks()" function (see CHANGE #3a and CHANGE #3b)
+
+# the "ensure_shared_models_folders()" function will be called from app.py::create_shared_folders(),
+# and replaces this function (see CHANGE #3)
+
+# the "init_app_install_dirs() function initializes the
+#   global module 'APP_INSTALL_DIRS' dict: { 'app_name': 'app_installdir' }
+# which does a default mapping from app code or (if exists) from external JSON 'APP_INSTALL_DIRS_FILE' file
+# NOTE: this APP_INSTALL_DIRS dict is temporary synced with the 'app_configs' dict (see next)
+
+# the "sync_with_app_configs_install_dirs() function syncs the 'APP_INSTALL_DIRS' dict's 'app_installdir' entries
+# from the 'app_configs' dict's 'app_path' entries and uses the MAP_APPS dict for this task
+# NOTE: this syncing is a temporary solution, and needs to be better integrated later
+
+# the "init_shared_model_app_map()" function initializes the
+#   global module 'SHARED_MODEL_APP_MAP' dict: 'model_type' -> 'app_name:app_model_dir' (relative path)
+# which does a default mapping from app code or (if exists) from external JSON 'SHARED_MODEL_APP_MAP_FILE' file
+
+
 from utils.websocket_utils import send_websocket_message, active_websockets
 from utils.app_configs import get_app_configs, add_app_config, remove_app_config, app_configs
 from utils.model_utils import download_model, check_civitai_url, check_huggingface_url, SHARED_MODELS_DIR, format_size
@@ -91,6 +127,11 @@ def index():
                            pod_id=RUNPOD_POD_ID, 
                            RUNPOD_PUBLIC_IP=os.environ.get('RUNPOD_PUBLIC_IP'),
                            RUNPOD_TCP_PORT_22=os.environ.get('RUNPOD_TCP_PORT_22'),
+
+ # lutzapps - CHANGE #2 - allow localhost Url for unsecure "http" and "ws" WebSockets protocol,
+ # according to LOCAL_DEBUG ENV var (used 3x in "index.html" changes)
+                           enable_unsecure_localhost=os.environ.get('LOCAL_DEBUG'),
+
                            settings=settings,
                            current_auth_method=current_auth_method,
                            ssh_password=ssh_password,
@@ -297,7 +338,20 @@ def remove_existing_app_config(app_name):
         return jsonify({'status': 'success', 'message': f'App {app_name} removed successfully'})
     return jsonify({'status': 'error', 'message': f'App {app_name} not found'})
 
+# unused function
+def obsolate_update_model_symlinks():
+    # lutzapps - CHANGE #3 - use the new "shared_models" module for app model sharing
+    # remove this whole now unused function
+    return "replaced by utils.shared_models.update_model_symlinks()"
+
+# modified function
 def setup_shared_models():
+    # lutzapps - CHANGE #4 - use the new "shared_models" module for app model sharing
+    jsonResult = update_model_symlinks()
+
+    return SHARED_MODELS_DIR # shared_models_dir is now owned and managed by the "shared_models" utils module
+    # remove below unused code
+    
     shared_models_dir = '/workspace/shared_models'
     model_types = ['Stable-diffusion', 'VAE', 'Lora', 'ESRGAN']
 
@@ -326,7 +380,12 @@ def setup_shared_models():
 
     return shared_models_dir
 
-def update_model_symlinks():
+# unused function
+def obsolate_update_model_symlinks():
+    # lutzapps - CHANGE #5 - use the new "shared_models" module for app model sharing
+    # remove this whole now unused function
+    return "replaced by utils.shared_models.update_model_symlinks()"
+
     shared_models_dir = '/workspace/shared_models'
     apps = {
         'stable-diffusion-webui': '/workspace/stable-diffusion-webui/models',
@@ -367,7 +426,7 @@ def update_model_symlinks():
     print("Model symlinks updated.")
 
 def update_symlinks_periodically():
-    while True:
+    while True: 
         update_model_symlinks()
         time.sleep(300)  # Check every 5 minutes
 
@@ -375,7 +434,12 @@ def start_symlink_update_thread():
     thread = threading.Thread(target=update_symlinks_periodically, daemon=True)
     thread.start()
 
-def recreate_symlinks():
+# unused function
+def obsolate_recreate_symlinks():
+    # lutzapps - CHANGE #6 - use the new "shared_models" module for app model sharing
+    # remove this whole now unused function
+    return "replaced by utils.shared_models.update_model_symlinks()"
+
     shared_models_dir = '/workspace/shared_models'
     apps = {
         'stable-diffusion-webui': '/workspace/stable-diffusion-webui/models',
@@ -421,16 +485,29 @@ def recreate_symlinks():
 
     return "Symlinks recreated successfully."
 
+# modified function
 @app.route('/recreate_symlinks', methods=['POST'])
 def recreate_symlinks_route():
+    # lutzapps - CHANGE #7 - use the new "shared_models" module for app model sharing
+    jsonResult = update_model_symlinks()
+
+    return jsonResult
+    # remove below unused code
+
     try:
         message = recreate_symlinks()
         return jsonify({'status': 'success', 'message': message})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
+# modified function
 @app.route('/create_shared_folders', methods=['POST'])
 def create_shared_folders():
+    # lutzapps - CHANGE #8 - use the new "shared_models" module for app model sharing
+    jsonResult = ensure_shared_models_folders()
+    return jsonResult
+    # remove below unused code
+
     try:
         shared_models_dir = '/workspace/shared_models'
         model_types = ['Stable-diffusion', 'Lora', 'embeddings', 'VAE', 'hypernetworks', 'aesthetic_embeddings', 'controlnet', 'ESRGAN']
@@ -486,6 +563,35 @@ def save_civitai_token_route():
 def get_civitai_token_route():
     token = load_civitai_token()
     return jsonify({'token': token})
+
+# lutzapps - CHANGE #9 - return model_types to populate the Download manager Select Option
+# new function to support the "Model Downloader" with the 'SHARED_MODEL_FOLDERS' dictionary
+@app.route('/get_model_types', methods=['GET'])
+def get_model_types_route():
+    model_types_dict = {}
+    
+    # check if the SHARED_MODELS_DIR exists at the "/workspace" location!
+    # that only happens AFTER the the user clicked the "Create Shared Folders" button
+    # on the "Settings" Tab of the app's WebUI!
+    # to reload existing SHARED_MODEL_FOLDERS into the select options dropdown list,
+    # we send a WebSockets message to "index.html"
+    
+    if not os.path.exists(SHARED_MODELS_DIR):
+        # return an empty model_types_dict, so the "Download Manager" does NOT get
+        # the already in-memory SHARED_MODEL_FOLDERS code-generated default dict
+        # BEFORE the workspace folders in SHARED_MODELS_DIR exists
+        return model_types_dict
+    
+    i = 0
+    for model_type, model_type_description in SHARED_MODEL_FOLDERS.items():
+        model_types_dict[i] = {
+            'modelfolder': model_type,
+            'desc': model_type_description
+        }
+
+        i = i + 1
+    
+    return model_types_dict
 
 @app.route('/download_model', methods=['POST'])
 def download_model_route():

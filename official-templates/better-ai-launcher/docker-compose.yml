@@ -1,0 +1,16 @@
+services:
+  mydev:
+    image: madiator2011/better-launcher:dev
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    env_file:
+      - .env # pass additional env-vars (hf_token, civitai token, ssh public-key) from ".env" file to container
+    environment:
+      - LOCAL_DEBUG=True # change app to localhost Urls and local Websockets (unsecured)
+    volumes:
+      - ${HOME}/Projects/Docker/madiator:/workspace:rw # # TODO: create the below folder before you run!
+    ports:
+      - 7222:7222 # main Flask app port better-launcher "App-Manager"
+      - 8181:8181 # File-Browser
+      - 7777:7777 # VSCode-Server

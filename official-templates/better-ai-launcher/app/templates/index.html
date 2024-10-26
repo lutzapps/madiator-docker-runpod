@@ -1211,11 +1211,11 @@
                             <div class="model-downloader">
                                 <input type="text" id="modelUrl" placeholder="Enter Civitai or Hugging Face URL">
                                 <input type="text" id="modelName" placeholder="Enter model name (optional)">
-                                <select id="modelType">
-                                    <option value="Stable-diffusion">Checkpoint (Stable Diffusion)</option>
-                                    <option value="Lora">LoRA</option>
-                                    <option value="VAE">VAE</option>
-                                    <option value="ESRGAN">Upscaler</option>
+                                <select id="modelType"><!-- lutzapps - Change #1 - remove default modelType select option values -->
+                                    <!-- <option value="Stable-diffusion">Checkpoint (Stable Diffusion)</option> -->
+                                    <!-- <option value="Lora">LoRA</option> -->
+                                    <!-- <option value="VAE">VAE</option> -->
+                                    <!-- <option value="ESRGAN">Upscaler</option> -->
                                 </select>
                                 <input type="password" id="civitaiToken" placeholder="Civitai API Token">
                                 <input type="text" id="hfToken" placeholder="Hugging Face API Token (optional)">
@@ -1302,7 +1302,23 @@
     let currentLogAppName = null;
     const podId = '{{ pod_id }}';
     const WS_PORT = 7222;  // This is the Nginx port
-    const WS_URL = `wss://${podId}-${WS_PORT}.proxy.runpod.net/ws`;
+
+
+    // *** lutzapps - Change #2 - support to run locally at http://localhost:${WS_PORT} (3 locations in "index.html")
+    const enable_unsecure_localhost = '{{ enable_unsecure_localhost }}';
+
+    // default is to use the "production" WeckSockets CloudFlare URL
+    // NOTE: ` (back-ticks) are used here for template literals
+    var WS_URL = `wss://${podId}-${WS_PORT}.proxy.runpod.net/ws`; // need to be declared as var
+
+    if (`${enable_unsecure_localhost}` === 'True') { // value of LOCAL_DEBUG ENV var
+        // make sure to use "ws" Protocol (insecure) instead of "wss" (WebSockets Secure) for localhost,
+        // otherwise you will get the 'loadingOverlay' stay and stays on screen with ERROR:
+        // "WebSocket disconnected. Attempting to reconnect..." blocking the webpage http://localhost:7222
+        WS_URL = `ws://localhost:${WS_PORT}/ws`; // localhost WS (unsecured)
+        //alert(`Running locally with WS_URL=${WS_URL}`);
+    }
+
 
     let socket;
     let reconnectAttempts = 0;
@@ -1446,7 +1462,14 @@
     }
 
     function openApp(appKey, port) {
-        const url = `https://${podId}-${port}.proxy.runpod.net/`;
+        // *** lutzapps - Change #3 - support to run locally
+        // NOTE: ` (back-ticks) are used here for template literals
+        var url = `https://${podId}-${port}.proxy.runpod.net/`; // need to be declared as var
+        if (`${enable_unsecure_localhost}` === 'True') {
+            url = `http://localhost:${port}/`; // remove runpod.net proxy
+            //alert(`openApp URL=${url}`);
+        }
+
         window.open(url, '_blank');
     }
 
@@ -1510,6 +1533,41 @@
         updateStatus();
         setInterval(updateStatus, 5000);
         setInterval(updateLogs, 1000);
+
+        initModelTypes(); // lutzapps - Change #4a - initialize the ModelTypes for the "Model Downloader"
+    }
+
+    // lutzapps - Change #4b - populate modeltype select options from shared_models
+    async function initModelTypes() {
+        const modelTypeSelect = document.getElementById('modelType');
+
+        // get the data from the Server
+        const response = await fetch('/get_model_types');
+        const result = await response.json();
+
+        //alert(JSON.stringify(result)); // show the JSON-String
+        var model_types = result; // get the JSON-Object
+        var count = Object.keys(model_types).length; // #18 when using the default SHARED_MODEL_FOLDERS dict
+
+        // the "/get_model_types" app.get_model_types_route() function checks
+        // if the SHARED_MODELS_DIR shared files already exists at the "/workspace" location.
+        // that only happens AFTER the the user clicked the "Create Shared Folders" button
+        // on the "Settings" Tab of the app's WebUI.
+        // it will return an empty model_types_dict, so the "Download Manager" does NOT get
+        // the already in-memory SHARED_MODEL_FOLDERS code-generated default dict
+        // BEFORE the workspace folders in SHARED_MODELS_DIR exists!
+        //
+        // when SHARED_MODELS_DIR exists (or updates), this function will be called via a Socket Message
+        // to "refresh" its content automatically
+
+        for (i = 0 ; i < count; i += 1) {
+            modelTypeOption = document.createElement('option');
+
+            modelTypeOption.setAttribute('value', model_types[String(i)]['modelfolder']);
+            modelTypeOption.appendChild(document.createTextNode(model_types[String(i)]['desc']));
+
+            modelTypeSelect.appendChild(modelTypeOption);
+        }
     }
 
     async function downloadModel() {
@@ -1914,10 +1972,18 @@
         }
 
     function openFileBrowser() {
-            const podId = '{{ pod_id }}';
-            const url = `https://${podId}-7222.proxy.runpod.net/fileapp/`;
-            window.open(url, '_blank');
+        const podId = '{{ pod_id }}';
+
+        // *** lutzapps - Change #5 - support to run locally
+        // NOTE: ` (back-ticks) are used here for template literals
+        var url = `https://${podId}-7222.proxy.runpod.net/fileapp/`; // need to be declared as var
+        if (`${enable_unsecure_localhost}` === 'True') {
+            url = `http://localhost:7222/fileapp/`; // remove runpod.net proxy
+            //alert(`FileBrowser URL=${url}`);
         }
+
+        window.open(url, '_blank');
+    }
 
         async function controlFileBrowser(action) {
             try {
@@ -2015,6 +2081,9 @@
                 updateModelDownloadProgress(data.data);
             } else if (data.type === 'status_update') {
                 updateAppStatus(data.data);
+            // lutzapps - Change #6 - int the "Model Downloader's" ModelTypes select dropdown list
+            } else if (data.type === 'init_model_downloader_model_types') {
+                initModelTypes(data.data);
             }
             // Handle other message types as needed
         } catch (error) {

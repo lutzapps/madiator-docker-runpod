@@ -1,0 +1,72 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "docker-build",
+			"label": "docker-build",
+			"platform": "python",
+			"dockerBuild": {
+				"tag": "madiator2011/better-launcher:dev",
+				"dockerfile": "${workspaceFolder}/Dockerfile",
+				"context": "${workspaceFolder}",
+				"pull": true
+			}
+		},
+		{
+			"type": "docker-run",
+			"label": "docker-run: debug",
+			"dependsOn": [
+				"docker-build"
+			],
+			"dockerRun": {
+				"containerName": "madiator2011-better-launcher", // no "/" allowed here for container name
+        		"image": "madiator2011/better-launcher:dev",
+				"envFiles": ["${workspaceFolder}/.env"], // pass additional env-vars (hf_token, civitai token, ssh public-key) from ".env" file to container
+				"env": { // this ENV vars go into the docker container to support local debugging
+					"LOCAL_DEBUG": "True", // change app to localhost Urls and local Websockets (unsecured)
+					"FLASK_APP": "app/app.py",
+					"FLASK_ENV": "development", // changed from "production"
+					"GEVENT_SUPPORT": "True" // gevent monkey-patching is being used, enable gevent support in the debugger
+					// "FLASK_DEBUG": "0"  // "1" allows debugging in Chrome, but then VSCode debugger not works
+				},
+				"volumes": [
+					{
+					  "containerPath": "/app",
+					  "localPath": "${workspaceFolder}" // the "/app" folder (and sub-folders) will be mapped locally for debugging and hot-reload
+					},
+					{
+						"containerPath": "/workspace",
+						// TODO: create the below folder before you run!
+						"localPath": "${userHome}/Projects/Docker/Madiator/workspace"
+					}
+				],
+				"ports": [
+				  {
+					"containerPort": 7222, // main Flask app port "App-Manager"
+					"hostPort": 7222
+				  },
+				  {
+					"containerPort": 8181, // File-Browser
+					"hostPort": 8181
+				  },
+				  {
+					"containerPort": 7777, // VSCode-Server
+					"hostPort": 7777
+				  }
+				]
+			},
+			"python": {
+				"args": [
+					"run",
+					// "--no-debugger", // disabled to support VSCode debugger
+					// "--no-reload", // disabled to support hot-reload
+					"--host",
+					"0.0.0.0",
+					"--port",
+					"7222"
+				],
+				"module": "flask"
+			}
+		}
+	]
+}
