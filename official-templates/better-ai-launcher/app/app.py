@@ -57,7 +57,7 @@ from utils.shared_models import (
 
 from utils.websocket_utils import send_websocket_message, active_websockets
 from utils.app_configs import get_app_configs, add_app_config, remove_app_config, app_configs
-from utils.model_utils import download_model, check_civitai_url, check_huggingface_url, SHARED_MODELS_DIR, format_size
+from utils.model_utils import download_model, check_civitai_url, check_huggingface_url, format_size #, SHARED_MODELS_DIR # lutzapps - SHARED_MODELS_DIR is owned by shared_models module now
 
 app = Flask(__name__)
 sock = Sock(app)
@@ -628,7 +628,10 @@ def download_model_route():
 @app.route('/get_model_folders')
 def get_model_folders():
     folders = {}
-    for folder in ['Stable-diffusion', 'VAE', 'Lora', 'ESRGAN']:
+    
+    # lutzapps - replace the hard-coded model types
+    for folder, model_type_description in SHARED_MODEL_FOLDERS.items():
+    #for folder in ['Stable-diffusion', 'VAE', 'Lora', 'ESRGAN']:
         folder_path = os.path.join(SHARED_MODELS_DIR, folder)
         if os.path.exists(folder_path):
             total_size = 0

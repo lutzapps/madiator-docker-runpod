@@ -6,24 +6,30 @@ import json
 import re
 import time
 import math
+# lutzapps - modify for new shared_models module and overwrite for this module
+from shared_models import (ensure_shared_models_folders, SHARED_MODELS_DIR)
 
-SHARED_MODELS_DIR = '/workspace/shared_models'
+#SHARED_MODELS_DIR = '/workspace/shared_models'
 
+# lutzapps - modify this CivitAI model_type mapping to the new SHARED_MODEL_FOLDERS map
 MODEL_TYPE_MAPPING = {
-    'Checkpoint': 'Stable-diffusion',
-    'LORA': 'Lora',
-    'LoCon': 'Lora',
+    # CivitAI-Modeltype: SHARED_MODEL_FOLDERS
+    'Checkpoint': 'ckpt', #'Stable-diffusion', # not clear name for model_type
+    'LORA': 'loras', #'Lora', # now lowercase and plural
+    'LoCon': 'loras', #'Lora', # now lowercase and plural
     'TextualInversion': 'embeddings',
-    'VAE': 'VAE',
+    'VAE': 'vae', #'VAE', # now lowercase
     'Hypernetwork': 'hypernetworks',
-    'AestheticGradient': 'aesthetic_embeddings',
+    'AestheticGradient': 'embeddings', #'aesthetic_embeddings', # store together with "embeddings"
     'ControlNet': 'controlnet',
-    'Upscaler': 'ESRGAN'
+    'Upscaler': 'upscale_models' #'ESRGAN' # there are probably other upscalers not based on ESRGAN
 }
 
 def ensure_shared_folder_exists():
-    for folder in ['Stable-diffusion', 'Lora', 'embeddings', 'VAE', 'hypernetworks', 'aesthetic_embeddings', 'controlnet', 'ESRGAN']:
-        os.makedirs(os.path.join(SHARED_MODELS_DIR, folder), exist_ok=True)
+    # lutzapps - replace with new shared_models code
+    #for folder in ['Stable-diffusion', 'Lora', 'embeddings', 'VAE', 'hypernetworks', 'aesthetic_embeddings', 'controlnet', 'ESRGAN']:
+    #    os.makedirs(os.path.join(SHARED_MODELS_DIR, folder), exist_ok=True)
+    ensure_shared_models_folders()
 
 def check_civitai_url(url):
     prefix = "civitai.com"
