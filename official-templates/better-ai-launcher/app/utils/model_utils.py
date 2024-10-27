@@ -7,7 +7,7 @@ import re
 import time
 import math
 # lutzapps - modify for new shared_models module and overwrite for this module
-from shared_models import (ensure_shared_models_folders, SHARED_MODELS_DIR)
+from utils.shared_models import (ensure_shared_models_folders, SHARED_MODELS_DIR)
 
 #SHARED_MODELS_DIR = '/workspace/shared_models'
 
