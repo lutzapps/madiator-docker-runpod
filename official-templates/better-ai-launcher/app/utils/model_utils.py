@@ -6,10 +6,12 @@ import json
 import re
 import time
 import math
+### model_utils-v0.2 by lutzapps, Oct 30th 2024 ###
 # lutzapps - modify for new shared_models module and overwrite for this module
-from utils.shared_models import (ensure_shared_models_folders, SHARED_MODELS_DIR)
+from utils.shared_models import (ensure_shared_models_folders, update_model_symlinks, SHARED_MODELS_DIR)
+from utils.websocket_utils import send_websocket_message, active_websockets
 
-#SHARED_MODELS_DIR = '/workspace/shared_models'
+#SHARED_MODELS_DIR = '/workspace/shared_models' # this global var is now owned by the 'shared_models' module
 
 # lutzapps - modify this CivitAI model_type mapping to the new SHARED_MODEL_FOLDERS map
 MODEL_TYPE_MAPPING = {
@@ -69,17 +71,17 @@ def check_huggingface_url(url):
     
     return True, repo_id, filename, folder_name, branch_name
 
-def download_model(url, model_name, model_type, send_websocket_message, civitai_token=None, hf_token=None, version_id=None, file_index=None):
+def download_model(url, model_name, model_type, civitai_token=None, hf_token=None, version_id=None, file_index=None):
     ensure_shared_folder_exists()
     is_civitai, is_civitai_api, model_id, _ = check_civitai_url(url)
-    is_huggingface, repo_id, hf_filename, hf_folder_name, hf_branch_name = check_huggingface_url(url)
+    is_huggingface, repo_id, hf_filename, hf_folder_name, hf_branch_name = check_huggingface_url(url) # TODO: double call
 
     if is_civitai or is_civitai_api:
         if not civitai_token:
             return False, "Civitai token is required for downloading from Civitai"
-        success, message = download_civitai_model(url, model_name, model_type, send_websocket_message, civitai_token, version_id, file_index)
+        success, message = download_civitai_model(url, model_name, model_type, civitai_token, version_id, file_index)
     elif is_huggingface:
-        success, message = download_huggingface_model(url, model_name, model_type, send_websocket_message, repo_id, hf_filename, hf_folder_name, hf_branch_name, hf_token)
+        success, message = download_huggingface_model(url, model_name, model_type, repo_id, hf_filename, hf_folder_name, hf_branch_name, hf_token)
     else:
         return False, "Unsupported URL"
 
@@ -92,7 +94,8 @@ def download_model(url, model_name, model_type, send_websocket_message, civitai_
     
     return success, message
 
-def download_civitai_model(url, model_name, model_type, send_websocket_message, civitai_token, version_id=None, file_index=None):
+# lutzapps - added SHA256 checks for already existing ident and downloaded HuggingFace model
+def download_civitai_model(url, model_name, model_type, civitai_token, version_id=None, file_index=None):
     try:
         is_civitai, is_civitai_api, model_id, url_version_id = check_civitai_url(url)
         
@@ -139,28 +142,204 @@ def download_civitai_model(url, model_name, model_type, send_websocket_message, 
                 }
             }
         else:
-            file_to_download = files[0]
-        
-        download_url = file_to_download['downloadUrl']
-        if not model_name:
-            model_name = file_to_download['name']
-        
-        model_path = os.path.join(SHARED_MODELS_DIR, model_type, model_name)
-        os.makedirs(os.path.dirname(model_path), exist_ok=True)
-        
-        return download_file(download_url, model_path, send_websocket_message, headers)
-    
-    except requests.RequestException as e:
-        return False, f"Error downloading from Civitai: {str(e)}"
+            civitai_file = files[0] # that is the metadata civitai_file
 
-def download_huggingface_model(url, model_name, model_type, send_websocket_message, repo_id, hf_filename, hf_folder_name, hf_branch_name, hf_token=None):
+        download_url = civitai_file['downloadUrl']
+        if not model_name:
+            model_name = civitai_file['name']
+
+        model_path = os.path.join(SHARED_MODELS_DIR, model_type, model_name)
+
+        platformInfo = {
+            "platform_name": 'civitai',
+            "civitai_file": civitai_file # civitai_file metadata dictionary
+        }
+        # call shared function for "huggingface" and "civitai" for SHA256 support and "Model Downloader UI" extended support
+        download_sha256_hash, found_ident_local_model, message = get_modelfile_hash_and_ident_existing_modelfile_exists(
+            model_name, model_type, model_path, # pass local workspace vars, then platform specific vars as dictionary
+            platformInfo) # [str, bool, str]
+
+        if found_ident_local_model:
+            return True, message
+
+        # model_path does NOT exist - run with original code
+
+        os.makedirs(os.path.dirname(model_path), exist_ok=True)
+    
+        # lutzapps - add SHA256 check for download_sha256_hash is handled after download finished in download_file()
+        return download_file(download_url, download_sha256_hash, model_path, headers) # [bool, str]
+    
+    except Exception as e: # requests.RequestException as e:
+
+        return False, f"Exception downloading from CivitAI: {str(e)}"
+
+
+# lutzapps - calculate the SHA256 hash string of a file
+def get_sha256_hash_from_file(file_path:str) -> tuple[bool, str]:
+    import hashlib # support SHA256 checks
+
+    try:
+        sha256_hash = hashlib.sha256()
+
+        with open(file_path, "rb") as f:
+            # read and update hash string value in blocks of 4K
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+
+        return True, sha256_hash.hexdigest().upper()
+    
+    except Exception as e:
+        return False, str(e)
+
+
+# lutzapps - support SHA256 Hash check of already locally existing modelfile against its metadata hash before downloading is needed
+# shared function for "huggingface" and "civitai" called by download_huggingface_model() and download_civitai_model()
+def get_modelfile_hash_and_ident_existing_modelfile_exists(model_name:str, model_type:str, model_path:str, platformInfo:dict) -> tuple[bool, str, str]:
+    try:
+        # update (and remember) the selected index of the modelType select list of the "Model Downloader"
+        message = f"Select the ModelType '{model_type}' to download"
+        print(message)
+
+        send_websocket_message('extend_ui_helper', {
+            'cmd': 'selectModelType',
+            'model_type': f'{model_type}', # e.g. "loras" or "vae"
+            'message': message
+        } )
+
+        # get the SHA256 hash - used for compare against existing or downloaded model
+        platform_name = platformInfo['platform_name'].lower() # currently "civitai" or "huggingface", but could be extendend
+        print(f"\nPlatform: {platform_name}")
+
+        match platform_name:
+            case "huggingface":
+                # get the platform-specific passed variables for "huggingface"
+                hf_token = platformInfo['hf_token']
+                repo_id = platformInfo['repo_id']
+                hf_filename = platformInfo['hf_filename']
+
+                #from huggingface_hub import hf_hub_download
+                # lutzapps - to get SHA256 hash from model
+                from huggingface_hub import (
+                    # HfApi, # optional when not calling globally
+                    get_paths_info #list_files_info #DEPRECATED/MISSING: list_files_info => get_paths_info
+                )
+                from huggingface_hub.hf_api import (
+                    RepoFile, RepoFolder, BlobLfsInfo
+                )
+
+                ## optionally configure a HfApi client instead of calling globally
+                # hf_api = HfApi(
+                #     endpoint = "https://huggingface.co", # can be a Private Hub endpoint
+                #     token = hf_token, # token is not persisted on the machine
+                # )
+
+                print(f"getting SHA256 Hash for '{model_name}' from repo {repo_id}/{hf_filename}")
+                # HfApi.list_files_info deprecated -> HfApi.get_paths_info (runs into exception, as connot be imported as missing)
+                #files_info = hf_api.list_files_info(repo_id, hf_filename, expand=True)
+                #paths_info = hf_api.get_paths_info(repo_id, hf_filename, expand=True) # use via HfApi
+                paths_info = get_paths_info(repo_id, hf_filename, expand=True) # use global (works fine)
+
+                repo_file = paths_info[0] # RepoFile or RepoFolder class instance
+                # check for RepoFolder or NON-LFS
+                if isinstance(repo_file, RepoFolder):
+                    raise NotImplementedError("Downloading a folder is not implemented.")
+                if not repo_file.lfs:
+                    raise NotImplementedError("Copying a non-LFS file is not implemented.")
+                
+                lfs = repo_file.lfs # BlobLfsInfo class instance
+                download_sha256_hash = lfs.sha256.upper()
+
+                print(f"Metadata from RepoFile LFS '{repo_file.rfilename}'")
+                print(f"SHA256: {download_sha256_hash}")
+
+            case "civitai":
+                # get the platform-specific passed variables for "civitai"
+                civitai_file = platformInfo['civitai_file'] # civitai_file metadata dictionary
+
+                # get the SHA256 hash - used for compare against existing or downloaded model
+                download_sha256_hash = civitai_file['hashes']['SHA256'] # civitai_file = passed file
+    
+        ### END platform specific code
+
+        # check if model file already exists
+        if not os.path.exists(model_path):
+            message = f"No local model '{os.path.basename(model_path)}' installed"
+            print(message)
+
+            return download_sha256_hash, False, message
+        
+        message = f"Model already exists: {os.path.basename(model_path)}, SHA256 check..."
+        print(message)
+
+        send_websocket_message('model_download_progress', {
+            'percentage': 0, # ugly
+            'stage': 'Downloading',
+            'message': message
+        })
+
+        # check if existing model is ident with model to download
+        # this can *take a while* for big models, but even better than to unnecessarily redownload the model
+        successfull_HashGeneration, model_sha256_hash = get_sha256_hash_from_file(model_path)
+        # if NOT successful, the hash contains the Exception
+        print(f"SHA256 hash generated from local file: '{model_path}'\n{model_sha256_hash}")
+        
+        if successfull_HashGeneration and model_sha256_hash == download_sha256_hash:
+            message = f"Existing and ident model aleady found for '{os.path.basename(model_path)}'"
+            print(message)
+
+            send_websocket_message('model_download_progress', {
+                'percentage': 100,
+                'stage': 'Complete',
+                'message': message
+            })
+
+            return download_sha256_hash, successfull_HashGeneration, message
+        
+        else:
+            if successfull_HashGeneration: # the generated SHA256 file model Hash did not match against the metadata hash 
+                message = f"Local installed model '{os.path.basename(model_path)}' has DIFFERENT \nSHA256: {model_sha256_hash}"
+                print(message)
+
+                return download_sha256_hash, False, message
+            
+            
+            else: # NOT successful, the hash contains the Exception
+                error_msg = model_sha256_hash
+                error_msg = f"Exception occured while generating the SHA256 hash for '{model_path}':\n{error_msg}"
+                print(error_msg)
+
+    except Exception as e:
+        error_msg = f"Exception when downloading from {platform_name}: {str(e)}"
+    
+    return "", False, error_msg # hash, identfile, message
+
+
+# lutzapps - added SHA256 checks for already existing ident and downloaded HuggingFace model
+def download_huggingface_model(url, model_name, model_type, repo_id, hf_filename, hf_folder_name, hf_branch_name, hf_token=None):
     try:
         from huggingface_hub import hf_hub_download
-        
+
         if not model_name:
             model_name = hf_filename
         
         model_path = os.path.join(SHARED_MODELS_DIR, model_type, model_name)
+
+        platformInfo = {
+            "platform_name": 'huggingface',
+            "hf_token": hf_token,
+            "repo_id": repo_id,
+            "hf_filename": hf_filename
+        }
+        # call shared function for "huggingface" and "civitai" for SHA256 support and "Model Downloader UI" extended support
+        download_sha256_hash, found_ident_local_model, message = get_modelfile_hash_and_ident_existing_modelfile_exists(
+            model_name, model_type, model_path, # pass local workspace vars, then platform specific vars as dictionary
+            platformInfo) # [str, bool, str]
+        
+        if found_ident_local_model:
+            return True, message
+        
+        # model_path does NOT exist - run with original code
+
         os.makedirs(os.path.dirname(model_path), exist_ok=True)
         
         send_websocket_message('model_download_progress', {
@@ -174,26 +353,26 @@ def download_huggingface_model(url, model_name, model_type, send_websocket_messa
             'filename': hf_filename,
             'subfolder': hf_folder_name,
             'revision': hf_branch_name,
-            'local_dir': os.path.dirname(model_path),
-            'local_dir_use_symlinks': False
+            'local_dir': os.path.dirname(model_path)
+            #'local_dir_use_symlinks': False # deprecated, should be removed
         }
         if hf_token:
             kwargs['token'] = hf_token
         
-        local_file = hf_hub_download(**kwargs)
-        
-        send_websocket_message('model_download_progress', {
-            'percentage': 100,
-            'stage': 'Complete',
-            'message': f'Download complete: {model_name}'
-        })
-        
-        return True, f"Successfully downloaded {model_name} from Hugging Face"
-    
-    except Exception as e:
-        return False, f"Error downloading from Hugging Face: {str(e)}"
+        file_path = hf_hub_download(**kwargs) ### HF_DOWNLOAD_START
+        ### HF_DOWNLOAD COMPLETE
 
-def download_file(url, filepath, send_websocket_message, headers=None):
+        # SHA256 Hash checks of downloaded modelfile against its metadata hash
+        # call shared function for "huggingface" and "civitai" for SHA256 support and "Model Downloader UI" extended support
+        return check_downloaded_modelfile(file_path, download_sha256_hash, "huggingface") # [bool, str]
+
+    except Exception as e:
+
+        return False, f"Exception when downloading from 'HuggingFace': {str(e)}"
+
+
+# lutzapps - added SHA256 check for downloaded CivitAI model
+def download_file(url, download_sha256_hash, file_path, headers=None):
     try:
         response = requests.get(url, stream=True, headers=headers)
         response.raise_for_status()
@@ -202,7 +381,7 @@ def download_file(url, filepath, send_websocket_message, headers=None):
         downloaded_size = 0
         start_time = time.time()
         
-        with open(filepath, 'wb') as file:
+        with open(file_path, 'wb') as file: ### CIVITAI_DOWNLOAD
             for data in response.iter_content(block_size):
                 size = file.write(data)
                 downloaded_size += size
@@ -221,18 +400,66 @@ def download_file(url, filepath, send_websocket_message, headers=None):
                         'stage': 'Downloading',
                         'message': f'Downloaded {format_size(downloaded_size)} / {format_size(total_size)}'
                     })
-        
-        send_websocket_message('model_download_progress', {
-            'percentage': 100,
-            'stage': 'Complete',
-            'message': f'Download complete: {os.path.basename(filepath)}'
-        })
-        
-        return True, f"Successfully downloaded {os.path.basename(filepath)}"
-    
-    except requests.RequestException as e:
-        return False, f"Error downloading file: {str(e)}"
 
+        ### CIVITAI_DOWNLOAD COMPLETE
+
+        # SHA256 Hash checks of downloaded modelfile against its metadata hash
+        # call shared function for "huggingface" and "civitai" for SHA256 support and "Model Downloader UI" extended support
+        return check_downloaded_modelfile(file_path, download_sha256_hash, "civitai") # [bool, str]
+    
+    except Exception as e:
+        return False, f"Exception when downloading from CivitAI: {str(e)}"
+
+# lutzapps - SHA256 Hash checks of downloaded modelfile against its metadata hash
+# shared function for "huggingface" and "civitai" for SHA256 support and "Model Downloader UI" extended support
+def check_downloaded_modelfile(model_path:str, download_sha256_hash:str, platform_name:str) -> tuple[bool, str]:
+    try:
+        # lutzapps - SHA256 check for download_sha256_hash
+        if download_sha256_hash == "":
+            
+            return False, f"Downloaded model could not be verified with Metadata, no SHA256 hash found on '{platform_name}'"
+
+        # check if downloaded local model file is ident with HF model download_sha256_hash metadata
+        # this can take a while for big models, but even better than to have a corrupted model
+        send_websocket_message('model_download_progress', {
+            'percentage': 90, # change back from 100 to 90 (ugly)
+            'stage': 'Complete', # leave it as 'Complete' as this "clears" SPEED/ETA Divs
+            'message': f'SHA256 Check for Model: {os.path.basename(model_path)}'
+        })
+
+        successfull_HashGeneration, model_sha256_hash = get_sha256_hash_from_file(model_path)
+        if successfull_HashGeneration and model_sha256_hash == download_sha256_hash:
+            send_websocket_message('model_download_progress', {
+                'percentage': 100,
+                'stage': 'Complete',
+                'message': f'Download complete: {os.path.basename(model_path)}'
+            })
+
+            update_model_symlinks() # create symlinks for this new downloaded model for all installed apps
+
+            return True, f"Successfully downloaded (SHA256 checked, and symlinked) '{os.path.basename(model_path)}' from {platform_name}"
+        
+        else:
+            if successfull_HashGeneration: # the generated SHA256 file model Hash did not match against the metadata hash 
+                message = f"The downloaded model '{os.path.basename(model_path)}' has DIFFERENT \nSHA256: {model_sha256_hash} as stored on {platform_name}\nFile is possibly corrupted and was DELETED!"
+                print(message)
+
+                os.remove(model_path) # delete corrupted, downloaded file
+                
+                return download_sha256_hash, False, message
+                        
+            else: # NOT successful, the hash contains the Exception
+                error_msg = model_sha256_hash
+                error_msg = f"Exception occured while generating the SHA256 hash for '{model_path}':\n{error_msg}"
+                print(error_msg)
+    
+    except Exception as e:
+        error_msg = f"Exception when downloading from {platform_name}: {str(e)}"
+
+    return False, error_msg
+
+
+# smaller helper functions
 def get_civitai_file_size(url, token):
     headers = {'Authorization': f'Bearer {token}'}
     try:

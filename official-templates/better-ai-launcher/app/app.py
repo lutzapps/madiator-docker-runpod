@@ -73,6 +73,8 @@ S3_BASE_URL = "https://better.s3.madiator.com/"
 SETTINGS_FILE = '/workspace/.app_settings.json'
 
 CIVITAI_TOKEN_FILE = '/workspace/.civitai_token'
+HF_TOKEN_FILE = '/workspace/.hf_token' # lutzapps - added support for HF_TOKEN_FILE
+
 
 def load_settings():
     if os.path.exists(SETTINGS_FILE):
@@ -544,11 +546,58 @@ def save_civitai_token(token):
     with open(CIVITAI_TOKEN_FILE, 'w') as f:
         json.dump({'token': token}, f)
 
+# lutzapps - added function - 'HF_TOKEN' ENV var
+def load_huggingface_token():
+    # look FIRST for Huggingface token passed in as 'HF_TOKEN' ENV var
+    HF_TOKEN = os.environ.get('HF_TOKEN', '')
+    
+    if not HF_TOKEN == "":
+        print("'HF_TOKEN' ENV var found")
+        ## send the found token to the WebUI "Models Downloader" 'hfToken' Password field to use
+        # send_websocket_message('extend_ui_helper', {
+        #     'cmd': 'hfToken', # 'hfToken' must match the DOM Id of the WebUI Password field in "index.html"
+        #     'message': "Put the HF_TOKEN in the WebUI Password field 'hfToken'"
+        # } )
+
+        return HF_TOKEN
+    
+    # only if the 'HF_API_TOKEN' ENV var was not found, then handle it via local hidden HF_TOKEN_FILE
+    try:
+        if os.path.exists(HF_TOKEN_FILE):
+            with open(HF_TOKEN_FILE, 'r') as f:
+                data = json.load(f)
+
+                return data.get('token')
+    except:
+        return None
+
+    return None
+
+# lutzapps - modified function - support 'CIVITAI_API_TOKEN' ENV var
 def load_civitai_token():
-    if os.path.exists(CIVITAI_TOKEN_FILE):
-        with open(CIVITAI_TOKEN_FILE, 'r') as f:
-            data = json.load(f)
-            return data.get('token')
+    # look FIRST for CivitAI token passed in as 'CIVITAI_API_TOKEN' ENV var
+    CIVITAI_API_TOKEN = os.environ.get('CIVITAI_API_TOKEN', '')
+    
+    if not CIVITAI_API_TOKEN == "":
+        print("'CIVITAI_API_TOKEN' ENV var found")
+        ## send the found token to the WebUI "Models Downloader" 'hfToken' Password field to use
+        # send_websocket_message('extend_ui_helper', {
+        #     'cmd': 'civitaiToken', # 'civitaiToken' must match the DOM Id of the WebUI Password field in "index.html"
+        #     'message': 'Put the CIVITAI_API_TOKEN in the WebUI Password field "civitaiToken"'
+        # } )
+
+        return CIVITAI_API_TOKEN
+    
+    # only if the 'CIVITAI_API_TOKEN' ENV var is not found, then handle it via local hidden CIVITAI_TOKEN_FILE
+    try:
+        if os.path.exists(CIVITAI_TOKEN_FILE):
+            with open(CIVITAI_TOKEN_FILE, 'r') as f:
+                data = json.load(f)
+
+                return data.get('token')
+    except:
+        return None
+        
     return None
 
 @app.route('/save_civitai_token', methods=['POST'])
@@ -562,6 +611,12 @@ def save_civitai_token_route():
 @app.route('/get_civitai_token', methods=['GET'])
 def get_civitai_token_route():
     token = load_civitai_token()
+    return jsonify({'token': token})
+
+# lutzapps - add support for passed in "HF_TOKEN" ENV var
+@app.route('/get_huggingface_token', methods=['GET'])
+def get_hugginface_token_route():
+    token = load_huggingface_token()
     return jsonify({'token': token})
 
 # lutzapps - CHANGE #9 - return model_types to populate the Download manager Select Option
@@ -599,12 +654,12 @@ def download_model_route():
     model_name = request.json.get('model_name')
     model_type = request.json.get('model_type')
     civitai_token = request.json.get('civitai_token') or load_civitai_token()
-    hf_token = request.json.get('hf_token')
+    hf_token = request.json.get('hf_token') or load_huggingface_token() # lutzapps - added HF_TOKEN ENV var support
     version_id = request.json.get('version_id')
     file_index = request.json.get('file_index')
 
     is_civitai, _, _, _ = check_civitai_url(url)
-    is_huggingface, _, _, _, _ = check_huggingface_url(url)
+    is_huggingface, _, _, _, _ = check_huggingface_url(url) # TODO: double call
 
     if not (is_civitai or is_huggingface):
         return jsonify({'status': 'error', 'message': 'Unsupported URL. Please use Civitai or Hugging Face URLs.'}), 400
@@ -613,7 +668,7 @@ def download_model_route():
         return jsonify({'status': 'error', 'message': 'Civitai token is required for downloading from Civitai.'}), 400
 
     try:
-        success, message = download_model(url, model_name, model_type, send_websocket_message, civitai_token, hf_token, version_id, file_index)
+        success, message = download_model(url, model_name, model_type, civitai_token, hf_token, version_id, file_index)
         if success:
             if isinstance(message, dict) and 'choice_required' in message:
                 return jsonify({'status': 'choice_required', 'data': message['choice_required']})

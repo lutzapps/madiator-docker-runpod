@@ -9,8 +9,8 @@ from flask import jsonify
 from utils.websocket_utils import send_websocket_message, active_websockets
 from utils.app_configs import (get_app_configs)
 
-### shared_models-v0.7 by ViennaFlying, Oct 25th 2024 ###
-### dev-my-v0.3
+### shared_models-v0.9.1 by lutzapps, Oct 30th 2024 ###
+### dev-my-v0.6
 
 # to run (and optionally DEBUG) this docker image "better-ai-launcher" in a local container on your own machine
 # you need to define the ENV var "LOCAL_DEBUG" in the "VSCode Docker Extension"
@@ -289,31 +289,31 @@ def init_shared_models_folders(send_SocketMessage:bool=True):
     init_global_dict_from_file(SHARED_MODEL_FOLDERS, SHARED_MODEL_FOLDERS_FILE, "SHARED_MODEL_FOLDERS")
 
     if os.path.exists(SHARED_MODEL_FOLDERS_FILE) and send_SocketMessage:
-        send_websocket_message('init_model_downloader_model_types', {
-            'stage': 'Refresh',
+        send_websocket_message('extend_ui_helper', {
+            'cmd': 'refreshModelTypes',
             'message': 'New ModelTypes are available'
-        })
+            } )
 
     return
 
 ### "inline"-main() ###
 # init the SHARED_MODEL_FOLDERS
-init_shared_models_folders(False) # dont send a WS-Message for "Model Downloader" at module init to init/refresh the model_type list
+init_shared_models_folders(False) # dont send a WS-Message for "Model Downloader" at module init, to init/refresh its modelType list
 
 # ----------
 
-# helper function called from "app.py" via WebUI
+# helper function called from "app.py" via WebUI "Create Shared Folders" button on "Settings" tab
 #   ensures 'model_type' sub-folders for Model Mapping and the "Model Downloader" exists
 #   in the SHARED_MODELS_DIR (uses above initialized 'SHARED_MODEL_FOLDERS' dict)
 def ensure_shared_models_folders():
     try:
         # init global module 'SHARED_MODEL_FOLDERS' dict: { 'model_type' (=subdir_names): 'app_model_dir'
-        # from app code or from external JSON 'SHARED_MODEL_FOLDERS_FILE' file 
-        init_shared_models_folders()
+        # from app code or from external JSON 'SHARED_MODEL_FOLDERS_FILE' file
+        init_shared_models_folders(False) # (re-)read the SHARED_MODEL_FOLDERS_FILE again, if changed, but don't refresh modelTypes in "Model Downloader" yet
 
         print(f"(re-)creating 'shared_models' model type sub-folders for Apps and the 'Model Downloader' in folder '{SHARED_MODELS_DIR}':")
 
-        # create the shared_models directory, if it doesn't exist
+        # create the shared_models directory, if it doesn't exist yet
         os.makedirs(f"{SHARED_MODELS_DIR}/", exist_ok=True) # append slash to make sure folder is created
 
         # create a "__README.txt" file in the shared_models directory
@@ -324,8 +324,8 @@ def ensure_shared_models_folders():
 
             for model_type, model_type_description in SHARED_MODEL_FOLDERS.items():
                 shared_model_folderpath = os.path.join(SHARED_MODELS_DIR, model_type)
+                
                 os.makedirs(os.path.dirname(f"{shared_model_folderpath}/"), exist_ok=True) # append trailing "/" to make sure the last sub-folder is created
-
                 print(f"'{model_type}' Folder created for '{model_type_description}'")
                 
                 model_type_name = model_type
@@ -342,6 +342,12 @@ def ensure_shared_models_folders():
             readme_file.write("\nThese models will be automatically linked to all supported apps.\n\n")
             readme_file.write("Models directly downloaded into an app model folder will be\n")
             readme_file.write("automatically pulled back into the corresponding shared folder and relinked back!\n")
+
+        # send a message for the "Model Downloader" to "refresh" its 'modelType' list
+        send_websocket_message('extend_ui_helper', {
+            'cmd': 'refreshModelTypes',
+            'message': 'New ModelTypes are available'
+        } )
 
         return jsonify({'status': 'success', 'message': 'Shared model folders created successfully.'})
     
@@ -775,7 +781,7 @@ def create_model_symlinks(shared_model_folderpath:str, app_model_folderpath:str,
 #
 # SHARED_MODEL_APP_MAP_FILE (str): "_shared_models_map.json" (based in SHARED_MODELS_DIR)
 # SHARED_MODEL_APP_MAP (dict) <- init from code, then write/read from path SHARED_MODEL_FOLDERS_FILE
-def update_model_symlinks():
+def update_model_symlinks() -> dict:
     try:
         print(f"Processing the master SHARED_MODELS_DIR: {SHARED_MODELS_DIR}")
         if not os.path.exists(SHARED_MODELS_DIR):
