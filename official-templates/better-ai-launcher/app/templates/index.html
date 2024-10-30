@@ -908,7 +908,8 @@
             font-size: 12px;
         }
 
-        #model-download-status,
+        /* lutzapps - allow word-wrap for model-download-status to see downloaded file at status: 'Complete'
+        /*#model-download-status,*/
         #model-download-speed,
         #model-download-eta {
             margin-top: 5px;
@@ -917,6 +918,12 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+        #model-download-status {
+            margin-top: 5px;
+            height: 20px;
+            line-height: 20px;
+            word-wrap: break-word;
         }
 
         /* Update the CSS for the token saving textbox */
@@ -932,9 +939,9 @@
         }
 
         .example-urls {
-        background-color: #333;
-        border-radius: 5px;
-        padding: 15px;
+            background-color: #333;
+            border-radius: 5px;
+            padding: 15px;
         }
 
         .example-url {
@@ -966,9 +973,9 @@
         }
 
         .model-folders-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 15px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
         }
 
         .model-folder {
@@ -981,11 +988,12 @@
             margin-top: 20px;
         }
 
+        /* lutzapps - double definition
         #model-download-status,
         #model-download-speed,
         #model-download-eta {
             margin-top: 10px;
-        }
+        } */
 
         #recreate-symlinks-container {
             margin-top: 20px;
@@ -1211,14 +1219,14 @@
                             <div class="model-downloader">
                                 <input type="text" id="modelUrl" placeholder="Enter Civitai or Hugging Face URL">
                                 <input type="text" id="modelName" placeholder="Enter model name (optional)">
-                                <select id="modelType">
-                                    <option value="Stable-diffusion">Checkpoint (Stable Diffusion)</option>
-                                    <option value="Lora">LoRA</option>
-                                    <option value="VAE">VAE</option>
-                                    <option value="ESRGAN">Upscaler</option>
+                                <select id="modelType"><!-- lutzapps - Change #1 - remove default modelType select option values -->
+                                    <!-- <option value="Stable-diffusion">Checkpoint (Stable Diffusion)</option> -->
+                                    <!-- <option value="Lora">LoRA</option> -->
+                                    <!-- <option value="VAE">VAE</option> -->
+                                    <!-- <option value="ESRGAN">Upscaler</option> -->
                                 </select>
                                 <input type="password" id="civitaiToken" placeholder="Civitai API Token">
-                                <input type="text" id="hfToken" placeholder="Hugging Face API Token (optional)">
+                                <input type="password" id="hfToken" placeholder="Hugging Face API Token (optional)">
                                 <button onclick="downloadModel()" class="settings-button">Download Model</button>
                             </div>
                             <div id="model-download-progress" style="display: none;">
@@ -1245,27 +1253,27 @@
                             <div class="example-urls">
                                 <div class="example-url">
                                     <span class="example-label">Stable Diffusion:</span>
-                                    <a href="#" class="example-link" id="example-sd" onclick="copyToClipboard(this.textContent); return false;"></a>
+                                    <a href="#" class="example-link" id="example-sd" onclick="useInModelDownloader('ckpt', this.textContent); return false;"></a>
                                 </div>
                                 <div class="example-url">
                                     <span class="example-label">LoRA:</span>
-                                    <a href="#" class="example-link" id="example-lora" onclick="copyToClipboard(this.textContent); return false;"></a>
+                                    <a href="#" class="example-link" id="example-lora" onclick="useInModelDownloader('loras', this.textContent); return false;"></a>
                                 </div>
                                 <div class="example-url">
                                     <span class="example-label">VAE:</span>
-                                    <a href="#" class="example-link" id="example-vae" onclick="copyToClipboard(this.textContent); return false;"></a>
+                                    <a href="#" class="example-link" id="example-vae" onclick="useInModelDownloader('vae', this.textContent); return false;"></a>
                                 </div>
                                 <div class="example-url">
                                     <span class="example-label">Upscaler:</span>
-                                    <a href="#" class="example-link" id="example-upscaler" onclick="copyToClipboard(this.textContent); return false;"></a>
+                                    <a href="#" class="example-link" id="example-upscaler" onclick="useInModelDownloader('upscale_models', this.textContent); return false;"></a>
                                 </div>
                                 <div class="example-url">
                                     <span class="example-label">Flux Dev:</span>
-                                    <a href="#" class="example-link" id="example-flux-dev" onclick="copyToClipboard(this.textContent); return false;"></a>
+                                    <a href="#" class="example-link" id="example-flux-dev" onclick="useInModelDownloader('unet', this.textContent); return false;"></a>
                                 </div>
                                 <div class="example-url">
                                     <span class="example-label">Flux Schnell:</span>
-                                    <a href="#" class="example-link" id="example-flux-schnell" onclick="copyToClipboard(this.textContent); return false;"></a>
+                                    <a href="#" class="example-link" id="example-flux-schnell" onclick="useInModelDownloader('unet', this.textContent); return false;"></a>
                                 </div>
                             </div>
                         </div>
@@ -1302,7 +1310,34 @@
     let currentLogAppName = null;
     const podId = '{{ pod_id }}';
     const WS_PORT = 7222;  // This is the Nginx port
-    const WS_URL = `wss://${podId}-${WS_PORT}.proxy.runpod.net/ws`;
+
+    // lutzapps - remember the last know MODELTYPE_SELECTED of the WebUI Dom Id 'modelType' "select dropdown" model list
+    // so the selection can be restored between "Tab Switches", and during refreshes/reloads of the modelType list
+    // this is handled by the extendUIHelper() function, which is called directly from JavaScript events,
+    // but is also called indirectly from Python code via WS message type='extend_ui_helper'
+    // e.g. from the model_utils:download_civitai_model() function, to preserve "state" of the selected modelType
+
+    let MODELTYPE_SELECTED = "";
+    modelType.onchange = function() {
+        MODELTYPE_SELECTED = this.value;
+        alert("onchange=" + MODELTYPE_SELECTED);
+    }
+
+    // *** lutzapps - Change #2 - support to run locally at http://localhost:${WS_PORT} (3 locations in "index.html")
+    const enable_unsecure_localhost = '{{ enable_unsecure_localhost }}';
+
+    // default is to use the "production" WeckSockets CloudFlare URL
+    // NOTE: ` (back-ticks) are used here for template literals
+    var WS_URL = `wss://${podId}-${WS_PORT}.proxy.runpod.net/ws`; // need to be declared as var
+
+    if (`${enable_unsecure_localhost}` === 'True') { // value of LOCAL_DEBUG ENV var
+        // make sure to use "ws" Protocol (insecure) instead of "wss" (WebSockets Secure) for localhost,
+        // otherwise you will get the 'loadingOverlay' stay and stays on screen with ERROR:
+        // "WebSocket disconnected. Attempting to reconnect..." blocking the webpage http://localhost:7222
+        WS_URL = `ws://localhost:${WS_PORT}/ws`; // localhost WS (unsecured)
+        //alert(`Running locally with WS_URL=${WS_URL}`);
+    }
+
 
     let socket;
     let reconnectAttempts = 0;
@@ -1407,6 +1442,9 @@
         }
         
         if (data.stage === 'Complete') {
+            // lutzapps - clear 'Speed: N/A' and 'ETA: Calculating...' Div textContent, when no eta/speed data, but 'Complete'
+            etaDiv.textContent = '';
+            speedDiv.textContent = '';
             loadModelFolders(); // Refresh the Existing Models section when download is complete
         }
     }
@@ -1446,7 +1484,14 @@
     }
 
     function openApp(appKey, port) {
-        const url = `https://${podId}-${port}.proxy.runpod.net/`;
+        // *** lutzapps - Change #3 - support to run locally
+        // NOTE: ` (back-ticks) are used here for template literals
+        var url = `https://${podId}-${port}.proxy.runpod.net/`; // need to be declared as var
+        if (`${enable_unsecure_localhost}` === 'True') {
+            url = `http://localhost:${port}/`; // remove runpod.net proxy
+            //alert(`openApp URL=${url}`);
+        }
+
         window.open(url, '_blank');
     }
 
@@ -1510,34 +1555,170 @@
         updateStatus();
         setInterval(updateStatus, 5000);
         setInterval(updateLogs, 1000);
+
+        var data = {};
+        data.cmd = 'refreshModelTypes';
+        extendUIHelper(data); // lutzapps - initialize the available SHARED_MODEL_FOLDERS for the "Model Downloader" modelType select list
+    }
+
+    // lutzapps - populate modeltype select options from shared_models
+    async function extendUIHelper(data) {
+        // check the data
+        // if no data is passed, the default cmd is "selectModelType" with no specific "model_type",
+        // which means to re-select the last selected modelType option from the global var MODELTYPE_SELECTED
+        var cmd = "selectModelType"; // default cmd, when called with empty data or empty cmd
+        var model_type = MODELTYPE_SELECTED; // the 'modelType' option value (=foldername) for the select dropdown list
+        var token = ""; // the token value of HF_TOKEN or CIVITAI_API_TOKEN to pass to the corresponding WebUI Password fields on the "Models" tab
+
+        var response;
+        var result;
+
+        if (data !== undefined && data.cmd !== undefined) {
+            cmd = data.cmd;
+            if (cmd === "selectModelType" && data.model_type !== undefined) {
+                model_type = data.model_type; // the model_type which is passed in to select
+            }
+            if ((cmd === "hfToken" || cmd === "civitaiToken") // cmd need to match the DOM id of the Password field on the "Models" tab
+                && data.token !== undefined) {
+                token = data.token; // if token = undefined or empty "", then the corresponding token get fetched from the server
+            }
+        }
+
+        //alert("extendUIHelper(): cmd=" + cmd +", model_type=" + model_type + ", token=" + token); // debug-info (DISABLED)
+
+        switch (cmd) {
+            case "civitaiToken":
+                if (token === "") { // get the data from the Server
+                    response = await fetch('/get_civitai_token');
+                    result = await response.json();
+                    token = result['token'];
+                }
+
+                alert(cmd + "=" + token);
+                // pass tokens from HF or CIVITAI ENV vars into their Password fields
+                document.getElementById(cmd).value = token; //'********'; // indicate a found token, but require to call back
+
+                break;
+
+            case "hfToken":
+                if (token === "") { // get the data from the Server
+                    response = await fetch('/get_huggingface_token');
+                    result = await response.json();
+                    token = result['token'];
+                }
+            
+                alert(cmd + "=" + token);
+                // pass tokens from HF or CIVITAI ENV vars into their Password fields
+                document.getElementById(cmd).value = token; //'********'; // indicate a found token, but require to call back
+
+                break;
+
+            case "refreshModelTypes":
+                // refresh and optionally select the 'modelType' list for "Model Downloader"
+                var modelTypeSelect = document.getElementById('modelType');
+
+                // get the data from the Server
+                response = await fetch('/get_model_types');
+                result = await response.json();
+
+                //alert(JSON.stringify(result)); // show the JSON-String
+                var model_types = result; // get the JSON-Object
+                var count = Object.keys(model_types).length; // count=18, when using the default SHARED_MODEL_FOLDERS dict
+
+                // the "/get_model_types" app.get_model_types_route() function checks
+                // if the SHARED_MODELS_DIR shared files already exists at the "/workspace" location.
+                // that only happens AFTER the the user clicked the "Create Shared Folders" button
+                // on the "Settings" Tab of the app's WebUI.
+                // it will return an empty model_types_dict, so the "Download Manager" does NOT get
+                // the already in-memory SHARED_MODEL_FOLDERS code-generated default dict
+                // BEFORE the workspace folders in SHARED_MODELS_DIR exists!
+                //
+                // when SHARED_MODELS_DIR exists (or updates), this function will be called via a Socket Message
+                // to "refresh" its content automatically
+
+                var modelTypeSelected = modelTypeSelect.value; // remember the current selected modelType.option value
+                modelTypeSelect.options.length = 0; // clear all current modelTypeSelect options
+
+                for (i = 0 ; i < count; i += 1) {
+                    modelTypeOption = document.createElement('option');
+
+                    modelType = model_types[String(i)]['modelfolder'];
+                    modelTypeOption.setAttribute('value', modelType);
+                    modelTypeOption.appendChild(document.createTextNode(model_types[String(i)]['desc']));
+                    //if (modelFolder === modelTypeSelected) {
+                    //    modelTypeOption.selected = true; // reselect it
+                    //}
+
+                    modelTypeSelect.appendChild(modelTypeOption);
+                }
+
+                //modelTypeSelect.selectedIndex = modelfolder_index; // set the selected index
+                //modelTypeSelect.options[mmodelfolder_index].selected = true; // and mark it as "selected" option
+                if (modelTypeSelected === "") { // initial refresh, called by initializeUI() function
+                    modelTypeSelect.selectedIndex = 0; // use the first modelType option, usually "ckpt"
+                    MODELTYPE_SELECTED = modelTypeSelect.options[0].value; // NOT handled by the onchange() event handler
+                }
+                else {
+                    modelTypeSelect.value = modelTypeSelected; // (re-)apply the selected modelType option
+                    MODELTYPE_SELECTED = modelTypeSelected; // NOT handled by the onchange() event handler
+                }
+
+                break;
+
+            case "selectModelType":
+                // this is called by model_utils:download_civitai_model() which passed the downloading 'model_type'
+                // to select for clarity, which can be different from the currently selected modelType option
+                // if called without a 'model_type', the last MODELTYPE_SELECTED will be selected (after a "Tab Switch")
+
+                // refresh and optionally select the 'modelType' list for "Model Downloader"
+                var modelTypeSelect = document.getElementById('modelType');
+                modelTypeSelect.value = model_type;
+                MODELTYPE_SELECTED = model_type; // NOT handled by the onchange() event handler
+
+                break;
+
+            default: // no cmd passed is same as "selectModelType" without a 'model_type'
+                // this is already handled by "selectModelType" defaults, there is no "default" case needed here
+        }
     }
 
     async function downloadModel() {
-    const url = document.getElementById('modelUrl').value;
-    const modelName = document.getElementById('modelName').value;
-    const modelType = document.getElementById('modelType').value;
-    const hfToken = document.getElementById('hfToken').value;
-    
-    let civitaiToken = null;
-    
-    // Check if the URL is from Civitai
-    if (url.includes('civitai.com')) {
-        civitaiToken = document.getElementById('civitaiToken').value;
-        if (civitaiToken === '********') {
-            // If the token is masked, fetch it from the server
-            const response = await fetch('/get_civitai_token');
-            const result = await response.json();
-            civitaiToken = result.token;
+        const url = document.getElementById('modelUrl').value;
+        const modelName = document.getElementById('modelName').value;
+        const modelType = document.getElementById('modelType').value;
+        //const hfToken = document.getElementById('hfToken').value;
+        let hfToken = null;
+        let civitaiToken = null;
+
+        // lutzapps - support HF_TOKEN ENV var
+        // Check if the URL is from Huggingface
+        if (url.toLowerCase().includes('huggingface.co')) { // be case-insensitive with this url
+            hfToken = document.getElementById('hfToken').value;
+            if (hfToken === '********') {
+                // if the token is masked, fetch it from the server
+                const response = await fetch('/get_huggingface_token');
+                const result = await response.json();
+                hfToken = result.token;
+            }
+        }        
+        // Check if the URL is from Civitai
+        if (url.toLowerCase().includes('civitai.com')) { // lutzapps - be case-insensitive with this url
+            civitaiToken = document.getElementById('civitaiToken').value;
+            if (civitaiToken === '********') {
+                // If the token is masked, fetch it from the server
+                const response = await fetch('/get_civitai_token');
+                const result = await response.json();
+                civitaiToken = result.token;
+            }
+            
+            if (!civitaiToken) {
+                alert('Civitai API token is required for Civitai URLs. Please enter it in the Civitai API Token field.');
+                return;
+            }
         }
         
-        if (!civitaiToken) {
-            alert('Civitai API token is required for Civitai URLs. Please enter it in the Civitai API Token field.');
-            return;
-        }
+        await startModelDownload(url, modelName, modelType, civitaiToken, hfToken);
     }
-    
-    await startModelDownload(url, modelName, modelType, civitaiToken, hfToken);
-}
 
 
     async function startModelDownload(url, modelName, modelType, civitaiToken, hfToken, versionId = null, fileIndex = null) {
@@ -1739,6 +1920,19 @@
         }
     }
 
+    // lutzapps - added HF_TOKEN support
+    async function loadHFToken() {
+        try {
+            const response = await fetch('/get_huggingface_token');
+            const result = await response.json();
+            if (result.token) {
+                document.getElementById('hfToken').value = '********';
+            }
+        } catch (error) {
+            console.error('Error loading Huggingface token:', error);
+        }
+    }
+
     function formatSize(sizeInBytes) {
         const units = ['B', 'KB', 'MB', 'GB', 'TB'];
         let size = sizeInBytes;
@@ -1765,7 +1959,7 @@
         }
     }
 
-    // Example URLs
+    // Example URLs - lutzapps - TODO: enrich data
     const exampleUrls = {
         'Stable-diffusion': 'https://civitai.com/models/90352/dreamshaper',
         'Lora': 'https://civitai.com/models/58390?modelVersionId=62833',
@@ -1784,6 +1978,25 @@
         document.getElementById('example-flux-schnell').textContent = exampleUrls['Flux-Schnell'];
     }
 
+    // lutzapps - replace function copyToClipboard() with function useInModelDownloader()
+    function useInModelDownloader(modelType, modelUrl) {
+        // copy the downloadUrl in the Model Downloader "Url" textbox
+        document.getElementById('modelUrl').value = modelUrl;
+
+        // select the modelType in the modelType select list, we are just about to download
+        var data = {};
+        data.cmd = 'selectModelType';
+        data.model_type = modelType;
+        extendUIHelper(data);
+
+        navigator.clipboard.writeText(modelUrl).then(() => {
+            alert('URL copied to Downloader and into the Clipboard!');
+        }, (err) => {
+            console.error('Could not copy text: ', err);
+        });
+    }
+
+    // lutzapps - obsolete function (can be deleted)
     function copyToClipboard(text) {
         navigator.clipboard.writeText(text).then(() => {
             alert('URL copied to clipboard!');
@@ -1794,8 +2007,12 @@
 
     // Call this function when the Models tab is opened
     document.querySelector('.navbar-tabs a[onclick="openTab(event, \'models-tab\')"]').addEventListener('click', function() {
-        loadModelFolders();
+        //alert("querySelector");
+        loadModelFolders(); // lutzapps - this ModelFolders is NOT for the 'modelType' "select dropdown" model list
+        extendUIHelper(); // lutzapps - select the last know MODELTYPE_SELECTED in the WebUI Dom Id 'modelType' "select dropdown" model list
         loadCivitaiToken();
+        loadHFToken(); // lutzapps - added HF_TOKEN ENV var Support
+
         updateExampleUrls();
     });
 
@@ -1820,10 +2037,13 @@
         // Additional actions when switching tabs
         if (tabName === 'apps-tab') {
             document.querySelector('.logs-section').style.display = 'flex';
-            updateLogs(); // Refresh logs when switching back to Apps tab
+            updateLogs(); // Refresh logs when switching back to the "Apps" tab
         } else if (tabName === 'models-tab') {
-            loadModelFolders();
-            loadCivitaiToken();
+            // lutzapps - the following event handler functions already fired
+            // in the queryselector eventhandler (esspecially for the "models-tab" tab)
+            //loadModelFolders();
+            //loadCivitaiToken();
+            //loadHFToken(); // lutzapps - added HF_TOKEN Support
         } else if (tabName === 'settings-tab') {
             loadSshDetails();
             updateFileBrowserStatus();
@@ -1914,10 +2134,18 @@
         }
 
     function openFileBrowser() {
-            const podId = '{{ pod_id }}';
-            const url = `https://${podId}-7222.proxy.runpod.net/fileapp/`;
-            window.open(url, '_blank');
+        const podId = '{{ pod_id }}';
+
+        // *** lutzapps - Change #5 - support to run locally
+        // NOTE: ` (back-ticks) are used here for template literals
+        var url = `https://${podId}-7222.proxy.runpod.net/fileapp/`; // need to be declared as var
+        if (`${enable_unsecure_localhost}` === 'True') {
+            url = `http://localhost:7222/fileapp/`; // remove runpod.net proxy
+            //alert(`FileBrowser URL=${url}`);
         }
+
+        window.open(url, '_blank');
+    }
 
         async function controlFileBrowser(action) {
             try {
@@ -2015,6 +2243,9 @@
                 updateModelDownloadProgress(data.data);
             } else if (data.type === 'status_update') {
                 updateAppStatus(data.data);
+            // lutzapps - use the extendUIHelper to "bridge" certain extensions between Python and JavaScript
+            } else if (data.type === 'extend_ui_helper') {
+                extendUIHelper(data.data);
             }
             // Handle other message types as needed
         } catch (error) {

@@ -300,7 +300,12 @@ def install_app(app_name, app_configs, send_websocket_message):
     else:
         return False, f"Unknown app: {app_name}"
 
-def update_model_symlinks():
+# unused function
+def onsolate_update_model_symlinks():
+    # lutzapps - CHANGE #7 - use the new "shared_models" module for app model sharing
+    # remove this whole now unused function
+    return "replaced by utils.shared_models.update_model_symlinks()"
+
     shared_models_dir = '/workspace/shared_models'
     apps = {
         'stable-diffusion-webui': '/workspace/stable-diffusion-webui/models',
