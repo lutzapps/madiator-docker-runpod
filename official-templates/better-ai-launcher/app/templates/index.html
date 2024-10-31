@@ -730,22 +730,26 @@
             padding: 20px;
             width: 100%;
             box-sizing: border-box;
+            height: 100%;
+            overflow-y: auto;
         }
 
         .settings-grid {
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
             gap: 20px;
-            justify-content: space-between;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            margin-bottom: 20px;
+            max-width: 1800px; /* Prevent excessive stretching on very wide screens */
+            margin: 0 auto;
         }
 
         .setting-group {
-            flex: 1 1 300px;
-            min-width: 300px;
             background-color: #2a2a2a;
             border-radius: 10px;
             padding: 20px;
-            margin-bottom: 20px;
+            height: fit-content;
+            min-width: unset; /* Remove fixed min-width */
+            max-width: 100%;
         }
 
         .setting-group h3 {
@@ -759,6 +763,8 @@
             border-radius: 5px;
             padding: 15px;
             margin-top: 10px;
+            max-width: 100%;
+            margin: 0 auto;
         }
 
         .settings-button {
@@ -815,19 +821,17 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            width: 100%;
         }
 
         .model-downloader input,
         .model-downloader select,
         .model-downloader button {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-            box-sizing: border-box;
-            border: 1px solid #444;
+            padding: 12px;
+            font-size: 14px;
             border-radius: 5px;
-            background-color: #333;
-            color: #fff;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .model-downloader button {
@@ -843,13 +847,19 @@
         }
 
         .example-urls {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            background-color: #333;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 10px;
         }
 
         .example-url {
-            display: flex;
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 10px;
             align-items: center;
         }
 
@@ -873,14 +883,18 @@
 
         .model-folders-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 1800px;
+            margin: 0 auto;
         }
 
         .model-folder {
             background-color: #333;
             border-radius: 5px;
             padding: 15px;
+            height: fit-content;
         }
 
         #model-download-progress {
@@ -1066,6 +1080,209 @@
             word-wrap: break-word;
             box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
             margin-bottom: 60px;
+        }
+
+        /* Add responsive styles */
+        @media screen and (max-width: 1200px) {
+            .settings-grid,
+            .model-management-container {
+                grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            }
+            
+            .model-folders-grid {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            }
+        }
+
+        @media screen and (max-width: 768px) {
+            .settings-grid,
+            .model-management-container {
+                grid-template-columns: 1fr;
+            }
+
+            .model-folders-grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            }
+
+            .settings-container {
+                padding: 15px;
+            }
+        }
+
+        @media screen and (max-width: 480px) {
+            .settings-container {
+                padding: 10px;
+            }
+
+            .setting-group {
+                padding: 15px;
+            }
+
+            .model-folders-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Update the models tab layout */
+        #models-tab .settings-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            padding: 20px;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        /* Make all top sections the same height */
+        .model-downloader-section,
+        .civitai-token-section,
+        .download-examples-section {
+            height: auto;
+            min-height: 400px; /* Consistent minimum height */
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Style consistency for model downloader inputs */
+        .model-downloader input,
+        .model-downloader select {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+            border: 1px solid #444;
+            border-radius: 5px;
+            background-color: #333;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        /* Style for the download button */
+        .model-downloader button,
+        .civitai-token-section button {
+            width: 100%;
+            padding: 12px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+        }
+
+        .model-downloader button:hover,
+        .civitai-token-section button:hover {
+            background-color: #45a049;
+        }
+
+        /* Improve example URLs section */
+        .example-urls {
+            background-color: #333;
+            border-radius: 5px;
+            padding: 15px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .example-url {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 10px;
+            align-items: center;
+            padding: 8px;
+            border-radius: 4px;
+            background-color: #2a2a2a;
+        }
+
+        /* Update model folders grid */
+        .model-folders-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .model-folder {
+            background-color: #333;
+            border-radius: 5px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .model-folder h4 {
+            margin: 0;
+            color: #4CAF50;
+        }
+
+        .model-folder p {
+            margin: 5px 0;
+            color: #ccc;
+        }
+
+        /* Responsive adjustments */
+        @media screen and (max-width: 1400px) {
+            #models-tab .settings-container {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .model-downloader-section,
+            .civitai-token-section {
+                min-height: 350px;
+            }
+            
+            .download-examples-section {
+                grid-column: 1 / -1;
+                min-height: 300px;
+            }
+        }
+
+        @media screen and (max-width: 900px) {
+            #models-tab .settings-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .model-downloader-section,
+            .civitai-token-section,
+            .download-examples-section {
+                min-height: auto;
+            }
+        }
+
+        /* Add subtle hover effects */
+        .setting-group:hover {
+            transform: translateY(-2px);
+            transition: transform 0.2s ease;
+        }
+
+        .example-url:hover {
+            background-color: #383838;
+            transition: background-color 0.2s ease;
+        }
+
+        /* Progress bar styling */
+        .progress-container {
+            margin-top: 15px;
+        }
+
+        .progress-bar {
+            height: 20px;
+            background-color: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            transition: width 0.3s ease;
         }
     </style>
 </head>
