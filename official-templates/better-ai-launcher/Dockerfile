@@ -1,7 +1,7 @@
-# Use the specified base image
-
- # lutzapps - use uppercase "AS"
- FROM madiator2011/better-base:cuda12.4 AS base
+# lutzapps - use the specified CUDA version
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE:-madiator2011/better-base:cuda12.4} AS base
+#FROM madiator2011/better-base:cuda12.4 AS base
 
 # lutzapps - prepare for local developement and debugging
 # needed to change the ORDER of "apt-get commands" and move the "update-alternatives" for python3
@@ -10,14 +10,16 @@
 
 # Install Python 3.11, set it as default, and remove Python 3.10
 RUN apt-get update && \
-    apt-get install -y python3.11 python3.11-venv python3.11-dev python3.11-distutils aria2 git \
-    pv git rsync zstd libtcmalloc-minimal4 bc nginx ffmpeg && \
-    apt-get remove -y python3.10 python3.10-minimal libpython3.10-minimal libpython3.10-stdlib && \
-    update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
-    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
-    apt-get autoremove -y && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# removed: 2x git nginx ffmpeg (as they are already installed with the base image)
+# added: zip (for easier folder compression)
+     apt-get install -y python3.11 python3.11-venv python3.11-dev python3.11-distutils aria2 zip \
+     pv rsync zstd libtcmalloc-minimal4 bc && \
+     apt-get remove -y python3.10 python3.10-minimal libpython3.10-minimal libpython3.10-stdlib && \
+     update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
+     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
+     apt-get autoremove -y && \
+     apt-get clean && \
+     rm -rf /var/lib/apt/lists/*
 
 # Install pip for Python 3.11
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
@@ -62,9 +64,6 @@ EXPOSE 7222
 # lutzapps - moved the 4 static assets (3x PNG, 1x MP3) into the /app/static" folder for cleaner view
 # lutzapps - added a "app/tests" folder with script and testdata and readme file
 # lutzapps - grouped NGINX files in a sub-folder for cleaner view
-
-# Copy the README.md
-COPY nginx/README.md /usr/share/nginx/html/README.md
 
 # NGINX configuration
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
