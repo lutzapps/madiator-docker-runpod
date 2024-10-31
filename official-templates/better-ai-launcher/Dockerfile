@@ -1,7 +1,7 @@
 # Use the specified base image
 
  # lutzapps - use uppercase "AS"
-FROM madiator2011/better-base:cuda12.1 AS base
+ FROM madiator2011/better-base:cuda12.4 AS base
 
 # lutzapps - prepare for local developement and debugging
 # needed to change the ORDER of "apt-get commands" and move the "update-alternatives" for python3
