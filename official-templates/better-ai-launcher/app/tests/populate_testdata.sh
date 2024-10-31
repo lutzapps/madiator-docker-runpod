@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# please use the "./readme-testdata.txt" before you extract these TARs!!!
+# please use the "./README-SHARED_MODELS.txt" before you extract these TARs!!!
 
 # Testcase #1
 tar -xzf /app/tests/testdata_shared_models_link.tar.gz /workspace

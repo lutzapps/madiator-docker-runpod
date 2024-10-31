@@ -24,10 +24,18 @@
 				"envFiles": ["${workspaceFolder}/.env"], // pass additional env-vars (hf_token, civitai token, ssh public-key) from ".env" file to container
 				"env": { // this ENV vars go into the docker container to support local debugging
 					"LOCAL_DEBUG": "True", // change app to localhost Urls and local Websockets (unsecured)
+					// if you NOT want need this behaviour, then set `LOCAL_DEBUG=False` [default],
+					// which is the same as NOT setting this ENV var at all.
+					
 					"FLASK_APP": "app/app.py",
-					"FLASK_ENV": "development", // changed from "production"
-					"GEVENT_SUPPORT": "True" // gevent monkey-patching is being used, enable gevent support in the debugger
-					// "FLASK_DEBUG": "0"  // "1" allows debugging in Chrome, but then VSCode debugger not works
+
+					"FLASK_ENV": "development", // changed from "production" [default],
+					// only needed when "LOCAL_DEBUG=True", otherwise this ENV var can be obmitted
+					
+					"GEVENT_SUPPORT": "True" // gevent monkey-patching is being used, enable gevent support in the debugger,
+					// only needed when "LOCAL_DEBUG=True", otherwise this ENV var can be obmitted
+
+					// "FLASK_DEBUG": "0"  // "1" allows debugging in Chrome, but then VSCode debugger not works, "0" is the [default], which is the same as NOT setting this ENV var at all
 				},
 				"volumes": [
 					{
