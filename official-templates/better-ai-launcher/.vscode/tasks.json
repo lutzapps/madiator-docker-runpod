@@ -49,18 +49,43 @@
 					}
 				],
 				"ports": [
-				  {
-					"containerPort": 7222, // main Flask app port "App-Manager"
-					"hostPort": 7222
-				  },
-				  {
-					"containerPort": 8181, // File-Browser
-					"hostPort": 8181
-				  },
-				  {
-					"containerPort": 7777, // VSCode-Server
-					"hostPort": 7777
-				  }
+					// NOTE: during debugging, "start.sh" does *not* run, and following apps are not available right now:
+					// {
+					// 	"containerPort": 22, // SSH
+					// 	"hostPort": 22
+					// },
+					{
+						"containerPort": 7222, // main Flask app port "App-Manager"
+						"hostPort": 7222
+					},
+					{
+						"containerPort": 8181, // File-Browser
+						"hostPort": 8181
+					},
+					{
+						"containerPort": 7777, // VSCode-Server
+						"hostPort": 7777
+					},
+					{
+						"containerPort": 3000, // ComfyUI
+						"hostPort": 3000
+					},
+					{
+						"containerPort": 6006, // Tensorboard (needed by kohya_ss)
+						"hostPort": 6006
+					},
+					{
+						"containerPort": 7860, // Kohya-ss (lutzapps - added new Kohya app with FLUX support)
+						"hostPort": 7860
+					},
+					{
+						"containerPort": 7862, // Forge (aka Stable-Diffiusion-WebUI-Forge)
+						"hostPort": 7862
+					},
+					{
+						"containerPort": 7863, // A1111 (aka Stable-Diffiusion-WebUI)
+						"hostPort": 7863
+					}
 				]
 			},
 			"python": {
