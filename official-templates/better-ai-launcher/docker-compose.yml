@@ -11,6 +11,14 @@ services:
     volumes:
       - ${HOME}/Projects/Docker/madiator:/workspace:rw # # TODO: create the below folder before you run!
     ports:
+      - 22:22     # SSH
+      
       - 7222:7222 # main Flask app port better-launcher "App-Manager"
       - 8181:8181 # File-Browser
       - 7777:7777 # VSCode-Server
+
+      - 3000:3000 # ComfyUI
+      - 6006:6006 # Tensorboard (needed by kohya_ss)
+      - 7860:7860 # Kohya-ss (lutzapps - added new Kohya app with FLUX support)
+      - 7862:7862 # Forge (aka Stable-Diffiusion-WebUI-Forge)
+      - 7863:7863 # A1111 (aka Stable-Diffiusion-WebUI)

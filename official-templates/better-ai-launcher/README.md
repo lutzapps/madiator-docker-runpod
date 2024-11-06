@@ -43,12 +43,13 @@ Part of the `madiator-docker-runpod` familiy of **RunPod Docker Containers for R
 https://github.com/kodxana/madiator-docker-runpod<br>
 found under the directory `official-templates/better-ai-launcher`
 
-### Build Vars ###
-IMAGE_BASE=madiator2011/better-launcher<br>
-IMAGE_TAG=dev
-
 ## Build Options
 To build with default options, run `docker buildx bake`, to build a specific target, run `docker buildx bake <target>`.
+
+### Build Vars (based on bake selection)
+BASE_IMAGE=`$BASE_IMAGE`, e.g.<br>
+BASE_IMAGE=madiator2011/better-base:cuda12.4
+
 
 ## Ports (System)
 
@@ -60,12 +61,10 @@ To build with default options, run `docker buildx bake`, to build a specific tar
 ## Ports (Apps)
 
 - 3000/http (ComfyUI)
+- 6006/http (Tensorboard [needed by kohya_ss])
+- 7860/http (Kohya-ss) with FLUX.1 support
 - 7862/http (Forge) aka Stable-Diffiusion-WebUI-Forge
 - 7863/http (A1111) aka Stable-Diffiusion-WebUI
-
-*coming soon*
-- 7864/http (Kohya-ss)
-- 6006/http (Tensorboard)
 
 ## ENV Vars (System)
 

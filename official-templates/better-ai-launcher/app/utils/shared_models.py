@@ -3,14 +3,12 @@ import shutil
 import datetime
 import threading
 import time
-import json
 
 from flask import jsonify
-from utils.websocket_utils import send_websocket_message, active_websockets
-from utils.app_configs import (get_app_configs)
+from utils.websocket_utils import (send_websocket_message, active_websockets)
+from utils.app_configs import (get_app_configs, init_global_dict_from_file, pretty_dict)
 
-### shared_models-v0.9.1 by lutzapps, Oct 30th 2024 ###
-### dev-my-v0.6
+### shared_models-v0.9.2 by lutzapps, Nov 5th 2024 ###
 
 # to run (and optionally DEBUG) this docker image "better-ai-launcher" in a local container on your own machine
 # you need to define the ENV var "LOCAL_DEBUG" in the "VSCode Docker Extension"
@@ -163,101 +161,6 @@ else:
 print(f"MAKE_MAPPING_FILES_HIDDEN='{MAKE_MAPPING_FILES_HIDDEN}'\n")
 
 
-# helper function to return a pretty formatted DICT string for human consumption (Logs, JSON)
-def PrettyDICT(dict:dict) -> str:
-   dict_string = json.dumps(dict, ensure_ascii=False, indent=4, separators=(',', ': '))
-
-   return dict_string
-
-# helper function called by init_shared_model_app_map() and init_shared_models_folders()
-def write_dict_to_jsonfile(dict:dict, json_filepath:str, overwrite:bool=False) -> bool:
-    # Convert the 'dict' to JSON, and write the JSON object to file 'json_filepath'
-
-    #json_string = json.dumps(dict, indent=4, ensure_ascii=False, sort_keys=True)  
-    
-    try:
-        if os.path.exists(json_filepath) and not overwrite:
-            error_msg = f"dictionary file '{json_filepath}' already exists (and overwrite={overwrite})"
-            #print(error_msg)
-
-            return False, error_msg # failure
-        
-        # Write the JSON data to a file
-        with open(json_filepath, 'w', encoding='utf-8') as output_file:
-            json.dump(dict, output_file, ensure_ascii=False, indent=4, separators=(',', ': '))
-
-    except Exception as e:
-        error_msg = f"ERROR in shared_models:write_dict_to_jsonfile() - loading JSON Map File '{json_filepath}'\nException: {str(e)}"
-        print(error_msg)
-
-        return False, error_msg # failure
-    
-    return True, "" # success
-
-# helper function called by init_shared_model_app_map() and init_shared_models_folders()
-def read_dict_from_jsonfile(json_filepath:str) -> dict:
-    # Read JSON file from 'json_filepath' and return it as 'dict'
-
-    try:
-        if os.path.exists(json_filepath):
-            with open(json_filepath, 'r') as input_file:
-                dict = json.load(input_file)
-        else:
-            error_msg = f"dictionary file '{json_filepath}' does not exist"
-            #print(error_msg)
-
-            return {}, error_msg # failure
-
-    except Exception as e:
-        error_msg = f"ERROR in shared_models:read_dict_from_jsonfile() - loading JSON Map File '{json_filepath}'\nException: {str(e)}"
-        print(error_msg)
-
-        return {}, error_msg # failure
-
-    return dict, "" # success
-
-# helper function for "init_app_install_dirs(), "init_shared_model_app_map()" and "init_shared_models_folders()"
-def init_global_dict_from_file(dict:dict, dict_filepath:str, dict_description:str) -> bool:
-    # load or initialize the 'dict' for 'dict_description' from 'dict_filepath'
-
-    try:
-        if not os.path.exists(SHARED_MODELS_DIR):
-            print(f"\nThe SHARED_MODELS_DIR '{SHARED_MODELS_DIR}' is not found!\nCreate it by clicking the 'Create Shared Folders' button from the WebUI 'Settings' Tab\n")
-            
-            return
-        
-        if os.path.isfile(dict_filepath) and os.path.exists(dict_filepath):
-            dict_filepath_found = True
-            # read the dict_description from JSON file
-            print(f"\nExisting '{dict_description}' found and read from file '{dict_filepath}'\nThe file overwrites the code defaults!")
-
-            dict, error_msg = read_dict_from_jsonfile(dict_filepath)
-            if not error_msg == "":
-                print(error_msg)
-
-        else: # init the dict_description from app code
-            dict_filepath_found = False
-            print(f"No '{dict_description}'_FILE found, initializing default '{dict_description}' from code ...")
-            # use already defined dict from app code
-            # write the dict to JSON file
-            success, ErrorMsg = write_dict_to_jsonfile(dict, dict_filepath)
-
-            if success:
-                print(f"'{dict_description}' is initialized and written to file '{dict_filepath}'")
-            else:
-                print(ErrorMsg)
-        
-        # Convert 'dict_description' dictionary to formatted JSON
-        print(f"\nUsing {'external' if dict_filepath_found else 'default'} '{dict_description}':\n{PrettyDICT(dict)}")
-
-    except Exception as e:
-        error_msg = f"ERROR in shared_models:init_global_dict_from_file() - initializing dict Map File '{dict_filepath}'\nException: {str(e)}"
-        print(error_msg)
-
-        return False, error_msg
-    
-    return True, "" # success
-
 # the below SHARED_MODEL_FOLDERS_FILE will be read and used (if exists),
 # otherwise this file will be generated with the content of the below default SHARED_MODEL_FOLDERS dict
 SHARED_MODEL_FOLDERS_FILE = f"{SHARED_MODELS_DIR}/{HIDDEN_FILE_PREFIX}_shared_model_folders.json"
@@ -286,7 +189,7 @@ SHARED_MODEL_FOLDERS = {
 # helper function called by "inline"-main() and ensure_shared_models_folders()
 def init_shared_models_folders(send_SocketMessage:bool=True):
     global SHARED_MODEL_FOLDERS
-    init_global_dict_from_file(SHARED_MODEL_FOLDERS, SHARED_MODEL_FOLDERS_FILE, "SHARED_MODEL_FOLDERS")
+    init_global_dict_from_file(SHARED_MODEL_FOLDERS, SHARED_MODEL_FOLDERS_FILE, "SHARED_MODEL_FOLDERS", SHARED_MODELS_DIR)
 
     if os.path.exists(SHARED_MODEL_FOLDERS_FILE) and send_SocketMessage:
         send_websocket_message('extend_ui_helper', {
@@ -368,7 +271,7 @@ APP_INSTALL_DIRS = {
     "A1111": "/workspace/stable-diffusion-webui",
     "Forge": "/workspace/stable-diffusion-webui-forge",
     "ComfyUI": "/workspace/ComfyUI",
-    "Kohya_ss": "/workspace/Kohya_ss",
+    "kohya_ss": "/workspace/kohya_ss",
     "CUSTOM1": "/workspace/joy-caption-batch"
 }
 
@@ -397,6 +300,13 @@ APP_INSTALL_DIRS = {
 #         'venv_path': '/workspace/ba1111',
 #         'app_path': '/workspace/stable-diffusion-webui',
 #         'port': 7863,
+#     },
+#     'bkohya': {
+#         'name': 'Better Kohya',
+#         'command': 'cd /workspace/bkohya && . ./bin/activate && cd /workspace/kohya_ss && ./gui.sh --listen --port 7860',
+#         'venv_path': '/workspace/bkohya',
+#         'app_path': '/workspace/kohya_ss',
+#         'port': 7860,
 #     }
 # }
 
@@ -405,7 +315,8 @@ APP_INSTALL_DIRS = {
 MAP_APPS = {
     "bcomfy": "ComfyUI",
     "bforge": "Forge",
-    "ba1111": "A1111"
+    "ba1111": "A1111",
+    "bkohya": "kohya_ss" # lutzapps - added new kohya_ss app
 }
 
 # helper function called by main(), uses above "MAP_APPS" dict
@@ -422,7 +333,7 @@ def sync_with_app_configs_install_dirs():
             APP_INSTALL_DIRS[MAP_APPS[bapp_name]] = bapp_path # update path in APP_INSTALL_DIRS
 
     # show final synced APP_INSTALL_DIRS
-    print(f"\nUsing synched 'APP_INSTALL_DIRS':\n{PrettyDICT(APP_INSTALL_DIRS)}")
+    print(f"\nUsing synched 'APP_INSTALL_DIRS':\n{pretty_dict(APP_INSTALL_DIRS)}")
 
      
 # init global module 'APP_INSTALL_DIRS' dict: { 'app_name': 'app_installdir' }
@@ -430,7 +341,7 @@ def sync_with_app_configs_install_dirs():
 # NOTE: this APP_INSTALL_DIRS_FILE is temporary synced with the app_configs dict
 def init_app_install_dirs():
     global APP_INSTALL_DIRS
-    init_global_dict_from_file(APP_INSTALL_DIRS, APP_INSTALL_DIRS_FILE, "APP_INSTALL_DIRS")
+    init_global_dict_from_file(APP_INSTALL_DIRS, APP_INSTALL_DIRS_FILE, "APP_INSTALL_DIRS", SHARED_MODELS_DIR)
 
     return
 
@@ -449,7 +360,7 @@ SHARED_MODEL_APP_MAP_FILE = f"{SHARED_MODELS_DIR}/{HIDDEN_FILE_PREFIX}_shared_mo
 # here is a list of all "known" model type dirs, and if they are used here (mapped) or
 # if they are currently "unmapped":
 #
-# "Kohya_ss" (mapped): "/models"
+# "kohya_ss" (mapped): "/models"
 
 # "ComfyUI" (mapped): "/models/checkpoints", "/models/clip", "/models/controlnet", "/models/embeddings", "/models/hypernetworks", "/models/ipadapter/"(???), "/models/loras", "/models/reactor"(???), "/models/unet", "/models/upscale_models", "/models/vae", "/models/vae_approx" 
 # "ComfyUI" (unmapped): "/models/clip_vision", "/models/diffusers", "/models/diffusion_models", "/models/gligen", "/models/photomaker", "/moedls/style_models", 
@@ -463,7 +374,7 @@ SHARED_MODEL_APP_MAP = {
         "ComfyUI": "/models/checkpoints",
         "A1111": "/models/Stable-diffusion",
         "Forge": "/models/Stable-diffusion",
-        "Kohya_ss": "/models" # flatten all "ckpt" / "unet" models here
+        "kohya_ss": "/models" # flatten all "ckpt" / "unet" models here
     },
 
     "clip": {
@@ -550,7 +461,7 @@ SHARED_MODEL_APP_MAP = {
         "ComfyUI": "/models/unet",
         "A1111": "/models/Stable-diffusion", # flatten all "ckpts" / "unet" models here
         "Forge": "/models/Stable-diffusion", # flatten all "ckpts" / "unet" models here
-        "Kohya_ss": "/models" # flatten all "ckpt" / "unet" models here
+        "kohya_ss": "/models" # flatten all "ckpt" / "unet" models here
     },
 
     "upscale_models": {
@@ -585,7 +496,7 @@ SHARED_MODEL_APP_MAP = {
 # which does a default mapping from app code or (if exists) from external JSON 'SHARED_MODEL_APP_MAP_FILE' file
 def init_shared_model_app_map():
     global SHARED_MODEL_APP_MAP
-    init_global_dict_from_file(SHARED_MODEL_APP_MAP, SHARED_MODEL_APP_MAP_FILE, "SHARED_MODEL_APP_MAP")
+    init_global_dict_from_file(SHARED_MODEL_APP_MAP, SHARED_MODEL_APP_MAP_FILE, "SHARED_MODEL_APP_MAP", SHARED_MODELS_DIR)
 
     return
 
@@ -919,3 +830,39 @@ print('\t- "populate_testdata.sh" (bash script to un-tar and expand all testdata
 print('\t- "testdata_shared_models_link.tar.gz" (Testcase #1, read below)')
 print('\t- "testdata_stable-diffusion-webui_pull.tar.gz" (Testcase #2, read below)')
 print('\t- "testdata_installed_apps_pull.tar.gz" (Testcase #3, read below)\n')
+
+if LOCAL_DEBUG:
+    # simulate a RUNPOD environment (e.g. for "/workspace/kohya_ss/setup.sh" or "setup-runpod.sh")
+    RUNPOD_POD_ID = "0ce86d9cc8dd"
+
+### setup.sh::
+# Check if RUNPOD variable should be set
+# RUNPOD=false
+# if env_var_exists RUNPOD_POD_ID || env_var_exists RUNPOD_API_KEY; then
+#   RUNPOD=true
+# fi
+#
+# # Check if the venv folder doesn't exist
+# if [ ! -d "$SCRIPT_DIR/venv" ]; then
+#     echo "Creating venv..."
+#     python3 -m venv "$SCRIPT_DIR/venv"
+# fi
+#
+# # Activate the virtual environment
+# echo "Activating venv..."
+# source "$SCRIPT_DIR/venv/bin/activate" || exit 1
+
+# if [[ "$OSTYPE" == "lin"* ]]; then
+#   if [ "$RUNPOD" = true ]; then
+#     DIR="/workspace/kohya_ss"
+#######
+
+### app_configs.py::
+#     'bkohya': {
+#         'name': 'Better Kohya',
+#         'command': 'cd /workspace/bkohya && . ./bin/activate && cd /workspace/kohya_ss && ./gui.sh --listen --port 7860',
+#         'venv_path': '/workspace/bkohya',
+#         'app_path': '/workspace/kohya_ss',
+#         'port': 7860,
+#     }
+#######

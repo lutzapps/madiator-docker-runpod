@@ -1,6 +1,12 @@
 # lutzapps - use the specified CUDA version
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE:-madiator2011/better-base:cuda12.4} AS base
+
+# lutzapps - pass the build-arg into the docker ENV as reference
+# as BASE_IMAGE is in "global scope" of the Dockerfile, it need to be "consumed" to be available in this stage
+ARG BASE_IMAGE
+ENV BASE_IMAGE=$BASE_IMAGE
+
 #FROM madiator2011/better-base:cuda12.4 AS base
 
 # lutzapps - prepare for local developement and debugging
@@ -10,16 +16,16 @@ FROM ${BASE_IMAGE:-madiator2011/better-base:cuda12.4} AS base
 
 # Install Python 3.11, set it as default, and remove Python 3.10
 RUN apt-get update && \
-# removed: 2x git nginx ffmpeg (as they are already installed with the base image)
-# added: zip (for easier folder compression)
-     apt-get install -y python3.11 python3.11-venv python3.11-dev python3.11-distutils aria2 zip \
-     pv rsync zstd libtcmalloc-minimal4 bc && \
-     apt-get remove -y python3.10 python3.10-minimal libpython3.10-minimal libpython3.10-stdlib && \
-     update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
-     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
-     apt-get autoremove -y && \
-     apt-get clean && \
-     rm -rf /var/lib/apt/lists/*
+    # removed: 2x git nginx ffmpeg (as they are already installed with the base image)
+    # added: pigz (for parallel execution of TAR files); zip (for easier folder compression)
+    apt-get install -y python3.11 python3.11-venv python3.11-dev python3.11-distutils \
+    aria2 pigz zip pv rsync zstd libtcmalloc-minimal4 bc && \
+    apt-get remove -y python3.10 python3.10-minimal libpython3.10-minimal libpython3.10-stdlib && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install pip for Python 3.11
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
