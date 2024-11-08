@@ -13,6 +13,8 @@ import xml.etree.ElementTree as ET
 import time
 import datetime
 import shutil
+from utils.app_configs import (DEBUG_SETTINGS, pretty_dict, init_app_configs, init_debug_settings, write_debug_setting, ensure_kohya_local_venv_is_symlinked)
+from utils.model_utils import (get_sha256_hash_from_file)
 
 INSTALL_STATUS_FILE = '/tmp/install_status.json'
 
@@ -180,41 +182,45 @@ import time
 
 #             yield (out_line.rstrip(), err_line.rstrip())
 
-# this ist the v2 ("fast") version for "download_and_unpack_venv()" - can be (de-)/activated in DEBUG_SETTINGS dict
-def download_and_unpack_venv_fastversion(app_name, app_configs, send_websocket_message) -> tuple[bool, str]:
+# this is the v2 ("fast") version for "download_and_unpack_venv()" - can be (de-)/activated in DEBUG_SETTINGS dict
+def download_and_unpack_venv_v2(app_name:str, app_configs:dict, send_websocket_message) -> tuple[bool, str]:
+    # load the latest configured DEBUG_SETTINGS from the stored setting of the DEBUG_SETTINGS_FILE
+    init_debug_settings() # reload latest DEBUG_SETTINGS
+    # as this could overwrite the APP_CONFIGS_MANIFEST_URL, we reload the app_configs global dict
+    # from whatever Url is now defined
+    init_app_configs() # reload lastest app_configs dict
+
     app_config = app_configs.get(app_name)
     if not app_config:
         return False, f"App '{app_name}' not found in configurations."
 
     venv_path = app_config['venv_path']
-    app_path = app_config['app_path']
     download_url = app_config['download_url']
-    total_size = app_config['size']
+    archive_size = app_config['archive_size']
+    
     tar_filename = os.path.basename(download_url)
     workspace_dir = '/workspace'
     downloaded_file = os.path.join(workspace_dir, tar_filename)
-
-    from utils.app_configs import (DEBUG_SETTINGS, pretty_dict, init_debug_settings, write_debug_setting, ensure_kohya_local_venv_is_symlinked)
-    # load the latest configured DEBUG_SETTINGS from the stored setting of the DEBUG_SETTINGS_FILE
-    init_debug_settings()
-    # show currently using DEBUG_SETTINGS
-    print(f"\nCurrently using 'DEBUG_SETTINGS':\n{pretty_dict(DEBUG_SETTINGS)}")
 
     write_debug_setting('tar_filename', tar_filename)
     write_debug_setting('download_url', download_url)
 
     try:
+        if DEBUG_SETTINGS['skip_to_github_stage']:
+            success, message = clone_application(app_config,send_websocket_message)
+            return success, message
+        
         save_install_status(app_name, 'in_progress', 0, 'Downloading')
-        send_websocket_message('install_log', {'app_name': app_name, 'log': f'Downloading {total_size / (1024 * 1024):.2f} MB ...'})
+        send_websocket_message('install_log', {'app_name': app_name, 'log': f'Downloading {archive_size / (1024 * 1024):.2f} MB ...'})
 
         start_time_download = time.time()
 
         # debug with existing local cached TAR file
         if os.path.exists(downloaded_file):
-            write_debug_setting('used_local_tar', "1") # indicate using cached TAR file
-            send_websocket_message('install_log', {'app_name': app_name, 'log': f"Used cached local tarfile '{downloaded_file}'"})
+            write_debug_setting('used_local_tarfile', True) # indicate using cached TAR file
+            send_websocket_message('used_local_tarfile', {'app_name': app_name, 'log': f"Used cached local tarfile '{downloaded_file}'"})
         else:
-            write_debug_setting('used_local_tar', "0") # indicate no cached TAR file found
+            write_debug_setting('used_local_tarfile', False) # indicate no cached TAR file found
 
             try: ### download with ARIA2C
 
@@ -275,8 +281,8 @@ def download_and_unpack_venv_fastversion(app_name, app_configs, send_websocket_m
                             gid = match.group(1)                    # e.g., "cd57da"
                             downloaded_size_value = match.group(2)  # e.g., "2.1"
                             downloaded_size_unit = match.group(3)   # e.g., "GiB"
-                            total_size_value =  match.group(4)      # e.g., "4.0"
-                            total_size_unit = match.group(5)        # e.g., "GiB"
+                            total_size_value =  match.group(4)      # e.g., "4.0" (this could replace the 'archive_size' from the manifest)
+                            total_size_unit = match.group(5)        # e.g., "GiB" (with calculation to bytes, but not sure if its rounded)
                             percentage = int(match.group(6))        # e.g., "53"
                             connection_count = int(match.group(7))  # e.g., "16"
                             download_rate_value = match.group(8)    # e.g., "1.9"
@@ -296,8 +302,8 @@ def download_and_unpack_venv_fastversion(app_name, app_configs, send_websocket_m
 
                             ### original code
                             #speed = downloaded_size / elapsed_time # bytes/sec
-                            #percentage = (downloaded_size / total_size) * 100
-                            #eta = (total_size - downloaded_size) / speed if speed > 0 else 0 # sec
+                            #percentage = (downloaded_size / archive_size) * 100
+                            #eta = (archive_size - downloaded_size) / speed if speed > 0 else 0 # sec
                             
                             send_websocket_message('install_progress', {
                                 'app_name': app_name,
@@ -329,7 +335,7 @@ def download_and_unpack_venv_fastversion(app_name, app_configs, send_websocket_m
                     os.remove(f"{tar_filename}.aria2")
 
             except Exception as e:
-                error_msg = f"ERROR in download_and_unpack_venv_fastversion():download with ARIA2C\ncmdline: '{cmd_line}'\nException: {str(e)}"
+                error_msg = f"ERROR in download_and_unpack_venv_v2():download with ARIA2C\ncmdline: '{cmd_line}'\nException: {str(e)}"
                 print(error_msg)
 
                 error_message = f"Downloading VENV failed: {download_process.stderr.read() if download_process.stderr else 'Unknown error'}"
@@ -356,8 +362,8 @@ def download_and_unpack_venv_fastversion(app_name, app_configs, send_websocket_m
                         
             #             if elapsed_time > 0:
             #                 speed = downloaded_size / elapsed_time
-            #                 percentage = (downloaded_size / total_size) * 100
-            #                 eta = (total_size - downloaded_size) / speed if speed > 0 else 0
+            #                 percentage = (downloaded_size / archive_size) * 100
+            #                 eta = (archive_size - downloaded_size) / speed if speed > 0 else 0
                             
             #                 send_websocket_message('install_progress', {
             #                     'app_name': app_name,
@@ -375,28 +381,71 @@ def download_and_unpack_venv_fastversion(app_name, app_configs, send_websocket_m
 
             return False, error_message
             
-        send_websocket_message('install_log', {'app_name': app_name, 'log': 'Download completed. Starting unpacking...'})
-        send_websocket_message('install_progress', {'app_name': app_name, 'percentage': 100, 'stage': 'Download Complete'})
+        send_websocket_message('install_log', {'app_name': app_name, 'log': 'Download completed. Starting Verification ...'})
+        # we use a 99% progress and indicate 1% for Verification against the files SHA256 hash
+        send_websocket_message('install_progress', {'app_name': app_name, 'percentage': 99, 'stage': 'Downloading'})
 
         total_duration_download = f"{datetime.timedelta(seconds=int(time.time() - start_time_download))}"
         write_debug_setting('total_duration_download', total_duration_download)
         print(f"download did run {total_duration_download} for app '{app_name}'")
 
 
+        ### VERIFY stage
+        #
+        # Create TAR from the VENV current directory:
+        #   IMPORTANT: cd INTO the folder you want to compress, as we use "." for source folder,
+        #   to avoid having the foldername in the TAR file !!!
+        #   PV piping is "nice-to-have" and is only used for showing "Progress Values" during compressing
+        #
+        #       cd /workspace/bkohya
+        #       #tar -czf | pv > /workspace/bkohya.tar.gz . (not the smallest TAR)#
+        #       tar -cvf - . | gzip -9 - | pv > /workspace/bkohya.tar.gz
+        #
+        #   afterwards create the SHA256 hash from this TAR with
+        #        shasum -a 256 bkohya.tar.gz
+        #
+        #   also report the uncompressed size from the current VENV directory,
+        #   we need that as the 100% base for the progress indicators when uncompressing the TAR
+
+
+        # verify the downloaded TAR file against its SHA256 hash value from the manifest
+
+        download_sha256_hash = app_config["sha256_hash"].lower() # get the sha256_hash from the app manifest
+        file_verified = False
+
+        print(f"getting SHA256 Hash for '{downloaded_file}'")
+        successfull_HashGeneration, file_sha256_hash = get_sha256_hash_from_file(downloaded_file)
+        
+        if successfull_HashGeneration and file_sha256_hash.lower() == download_sha256_hash.lower():
+            file_verified = True
+            message = f"Downloaded file '{os.path.basename(downloaded_file)}' was successfully (SHA256) verified."
+            print(message)
+        
+        else:
+            if successfull_HashGeneration: # the generated SHA256 file hash did not match against the metadata hash 
+                error_message = f"The downloaded file '{os.path.basename(downloaded_file)}' has DIFFERENT \nSHA256: {file_sha256_hash} as in the manifest\nFile is possibly corrupted and was DELETED!"
+                print(error_message)
+
+                os.remove(downloaded_file) # delete corrupted, downloaded file
+           
+            
+            else: # NOT successful, the hash contains the Exception
+                error_msg = file_sha256_hash
+                error_message = f"Exception occured while generating the SHA256 hash for '{downloaded_file}':\n{error_msg}"
+                print(error_message)
+
+        if not file_verified:
+            send_websocket_message('install_complete', {'app_name': app_name, 'status': 'error', 'message': error_message})
+            save_install_status(app_name, 'failed', 0, 'Failed')
+
+            return False, error_message
+
+        send_websocket_message('install_log', {'app_name': app_name, 'log': 'Verification completed. Starting unpacking ...'})
+        send_websocket_message('install_progress', {'app_name': app_name, 'percentage': 100, 'stage': 'Download Complete'})
+
+
         ### Decompression Stage (Unpacking the downloaded VENV)
         start_time_unpack = time.time()
-
-        # lutzapps - fix TAR packaging bug (compressed from the workspace root instead of bkohya VENV folder)
-        # e.g. "bkohya/bin/activate", together with venv_path ("/workspace/bkohya") ends up as "/workspace/bkohya/bkohya/bin/activate"
-        # TODO: need to repackage Kohya VENV correctly and then remove this fix!!!
-
-        if app_name == "bkohya" and DEBUG_SETTINGS['use_bkohya_tar_folder_fix'] == "1":
-            venv_path = "/workspace" # extracts then correctly to '/workspace/bkohya', instead of '/workspace/bkohya/bkohya'  
-
-        # Create TAR from the VENV current directory:
-        #   cd ~/Projects/Docker/madiator/workspace/bkohya
-        #   [tar -czf | pv > ~/Projects/Docker/madiator/workspace/bkohya.tar.gz . (not the smallest TAR)]
-        #   tar -cvf - . | gzip -9 - | pv > ~/Projects/Docker/madiator/workspace/bkohya.tar.gz
 
         # Ensure the venv directory exists
         os.makedirs(f"{venv_path}/", exist_ok=True) # append trailing "/" to make sure the last sub-folder is created
@@ -419,11 +468,8 @@ def download_and_unpack_venv_fastversion(app_name, app_configs, send_websocket_m
         # 'bforge': 7689838771 
         # 'bkohya': 12192767148
 
-        uncompressed_size_bytes = DEBUG_SETTINGS["manifests"][app_name]["venv_uncompressed_size"]
+        uncompressed_size_bytes = app_config["venv_uncompressed_size"]
         
-        #sha256_hash = DEBUG_SETTINGS["manifests"][app_name]["sha256_hash"]
-        # TODO: create with 'shasum -a 256 xxx.tar.gz'
-
         ### NOTE: as it turns out GZIP has problems with files bigger than 2 or 4 GB due to internal field bit restrictions
 
         # cmd_line = f"gzip -l {downloaded_file}" # e.g. for 'ba1111.tar.gz'
@@ -601,7 +647,7 @@ def download_and_unpack_venv_fastversion(app_name, app_configs, send_websocket_m
                     # else any other line in stdout (which we not process)
 
         except Exception as e:
-            error_msg = f"ERROR in download_and_unpack_venv_fastversion():\ncmdline: '{cmd_line}'\nException: {str(e)}"
+            error_msg = f"ERROR in download_and_unpack_venv_v2():\ncmdline: '{cmd_line}'\nException: {str(e)}"
             print(error_msg)
 
         decompression_process.wait() # let the process finish
@@ -621,8 +667,11 @@ def download_and_unpack_venv_fastversion(app_name, app_configs, send_websocket_m
         
         send_websocket_message('install_progress', {'app_name': app_name, 'percentage': 100, 'stage': 'Unpacking Complete'})
 
-        print(f"'DEBUG_SETTINGS' after this run:\n{pretty_dict(DEBUG_SETTINGS)}")
+        ### installing the App from GITHUB
+        # Clone the repository if it doesn't exist
+        success, message = clone_application(app_name)
 
+        print(f"'DEBUG_SETTINGS' after this run:\n{pretty_dict(DEBUG_SETTINGS)}")
         
         ### original "v1" code (very slow code because of STATISTICS glory
 
@@ -647,66 +696,29 @@ def download_and_unpack_venv_fastversion(app_name, app_configs, send_websocket_m
         # process.wait()
         # rc = process.returncode
 
-
         ### installing the App from GITHUB
         # Clone the repository if it doesn't exist
-        if not os.path.exists(app_path):
-            send_websocket_message('install_log', {'app_name': app_name, 'log': 'Cloning repository...'})
-            
-            repo_url = ''
-            if app_name == 'bcomfy':
-                repo_url = 'https://github.com/comfyanonymous/ComfyUI.git'
-            elif app_name == 'bforge':
-                repo_url = 'https://github.com/lllyasviel/stable-diffusion-webui-forge.git'
-            elif app_name == 'ba1111':
-                repo_url = 'https://github.com/AUTOMATIC1111/stable-diffusion-webui.git'
-            elif app_name == 'bkohya': # lutzapps - added new Kohya app
-                repo_url = 'https://github.com/bmaltais/kohya_ss.git'
-            
-            try: # add a repo assignment for Kohya
-                repo = git.Repo.clone_from(repo_url, app_path, progress=lambda op_code, cur_count, max_count, message: send_websocket_message('install_log', {
-                    'app_name': app_name,
-                    'log': f"Cloning: {cur_count}/{max_count} {message}"
-                }))
-                send_websocket_message('install_log', {'app_name': app_name, 'log': 'Repository cloned successfully.'})
-
-                # lutzapps - make sure we use Kohya with FLUX support
-                if app_name == 'bkohya':
-                    branch_name = "sd3-flux.1" # this branch also uses a "sd-scripts" branch "SD3" automatically
-                    repo.git.checkout(branch_name)
-
-                # Clone ComfyUI-Manager for Better ComfyUI
-                if app_name == 'bcomfy':
-                    custom_nodes_path = os.path.join(app_path, 'custom_nodes')
-                    os.makedirs(custom_nodes_path, exist_ok=True)
-                    comfyui_manager_path = os.path.join(custom_nodes_path, 'ComfyUI-Manager')
-                    if not os.path.exists(comfyui_manager_path):
-                        send_websocket_message('install_log', {'app_name': app_name, 'log': 'Cloning ComfyUI-Manager...'})
-                        git.Repo.clone_from('https://github.com/ltdrdata/ComfyUI-Manager.git', comfyui_manager_path)
-                        send_websocket_message('install_log', {'app_name': app_name, 'log': 'ComfyUI-Manager cloned successfully.'})
-
-            except git.exc.GitCommandError as e:
-                send_websocket_message('install_log', {'app_name': app_name, 'log': f'Error cloning repository: {str(e)}'})
-                return False, f"Error cloning repository: {str(e)}"
-
-        if app_name == 'bkohya': # create a folder link for kohya_ss local "venv"
-            ensure_kohya_local_venv_is_symlinked()  
+        success, error_message = clone_application(app_name, send_websocket_message)
 
         # Clean up the downloaded file
         send_websocket_message('install_log', {'app_name': app_name, 'log': 'Cleaning up...'})
 
         # lutzapps - debug with local TAR
         # do NOT delete the Kohya venv
-        if DEBUG_SETTINGS["delete_tarfile_after_download"] == "1": # this is the default, but can be overwritten
+        if DEBUG_SETTINGS["delete_tar_file_after_download"]: # this is the default, but can be overwritten
             os.remove(downloaded_file)
 
         send_websocket_message('install_log', {'app_name': app_name, 'log': 'Installation complete. Refresh page to start app'})
 
-        save_install_status(app_name, 'completed', 100, 'Completed')
-        send_websocket_message('install_complete', {'app_name': app_name, 'status': 'success', 'message': "Virtual environment installed successfully."})
-        return True, "Virtual environment installed successfully."
+        if success:
+            save_install_status(app_name, 'completed', 100, 'Completed')
+            send_websocket_message('install_complete', {'app_name': app_name, 'status': 'success', 'message': "Virtual environment installed successfully."})
+            return True, "Virtual environment installed successfully."
+        else:
+            return False, error_message
+    
     except requests.RequestException as e:
-        error_message = f"Download failed: {str(e)}"
+        error_message = f"Download/Decompression failed: {str(e)}"
         send_websocket_message('install_complete', {'app_name': app_name, 'status': 'error', 'message': error_message})
         save_install_status(app_name, 'failed', 0, 'Failed')
         return False, error_message
@@ -716,8 +728,143 @@ def download_and_unpack_venv_fastversion(app_name, app_configs, send_websocket_m
         send_websocket_message('install_complete', {'app_name': app_name, 'status': 'error', 'message': error_message})
         return False, error_message
 
+### installing the App from GITHUB
+# Clone the repository if it doesn't exist
+def clone_application(app_config:dict, send_websocket_message) -> tuple[bool , str]:
+    try:
+        app_name = app_config['id']
+        app_path = app_config['app_path']
 
-def download_and_unpack_venv(app_name, app_configs, send_websocket_message):
+        if not os.path.exists(app_path): # only install new apps           
+            repo_url = app_config['repo_url']
+            branch_name = app_config['branch_name']
+            if branch_name == "": # use the default branch
+                branch_name = "master"
+            clone_recursive = app_config['clone_recursive']
+
+            send_websocket_message('install_log', {'app_name': app_name, 'log': f"Cloning repository '{repo_url}' branch '{branch_name}' recursive={clone_recursive} ..."})
+
+            repo = git.Repo.clone_from(repo_url, app_path, # first 2 params are fix, then use named params
+                #branch=branch_name, # if we provide a branch here, we ONLY get this branch downloaded
+                # we want ALL branches, so we can easy checkout different versions from kohya_ss late, without re-downloading
+                recursive=clone_recursive, # include cloning submodules recursively (if needed as with Kohya)
+                progress=lambda op_code, cur_count, max_count, message: send_websocket_message('install_log', {
+                    'app_name': app_name,
+                    'log': f"Cloning: {cur_count}/{max_count} {message}"
+            }))
+
+
+            send_websocket_message('install_log', {'app_name': app_name, 'log': 'Repository cloned successfully.'})
+
+            # lutzapps - make sure we use Kohya with FLUX support
+            if not branch_name == "master":
+                repo.git.checkout(branch_name) # checkout the "sd3-flux.1" branch, but could later switch back to "master" easy
+                # the setup can be easy verified with git, here e.g. for the "kohya_ss" app:
+                    # root@fe889cc68f5a:~# cd /workspace/kohya_ss
+                    # root@fe889cc68f5a:/workspace/kohya_ss# git branch
+                    # master
+                    # * sd3-flux.1
+                    # root@fe889cc68f5a:/workspace/kohya_ss# cd sd-scripts
+                    # root@fe889cc68f5a:/workspace/kohya_ss/sd-scripts# git branch
+                    # * (HEAD detached at b8896aa)
+                    # main
+                #
+                # in the case of kohya_ss we need to fix a bug in the 'setup.sh' file,
+                # where they forgot to adapt the branch name from "master" to "sd3-flux.1"
+                # in the "#variables" section for refreshing kohya via git with 'setup.sh'
+                if app_name == 'bkohya':
+                    success, message = update_kohya_setup_sh(app_path) # patch the 'setup.sh' file
+                    print(message) # shows, if the patch was needed, and apllied successfully
+        else: # refresh app
+            if app_path['refresh']: # app wants auto-refreshes
+                # TODO: implement app refreshes via git pull or, in the case of 'kohya_ss' via "setup.sh"
+                message = f"Refreshing of app '{app_name}' is NYI"
+                print(message)
+
+        # Clone ComfyUI-Manager and other defined custom_nodes for Better ComfyUI
+        if app_name == 'bcomfy':
+            # install all defined custom nodes
+            custom_nodes_path = os.path.join(app_path, 'custom_nodes')
+            os.makedirs(f"{custom_nodes_path}/", exist_ok=True) # append a trailing slash to be sure last dir is created
+            for custom_node in app_config['custom_nodes']:
+                name = custom_node['name']
+                path = custom_node['path']
+                repo_url = custom_node['repo_url']
+                custom_node_path = os.path.join(custom_nodes_path, path)
+                
+                if not os.path.exists(custom_node_path): # only install new custom nodes
+                    send_websocket_message('install_log', {'app_name': app_name, 'log': f"Cloning '{name}' ..."})
+                    git.Repo.clone_from(repo_url, custom_node_path)
+                    send_websocket_message('install_log', {'app_name': app_name, 'log': f"'{name}' cloned successfully."})
+
+                    # install requirements
+                    venv_path = app_config['venv_path']
+                    #app_path = app_config['app_path'] # already defined
+                    
+                    try:
+                        # Activate the virtual environment and run the commands
+                        activate_venv = f"source {venv_path}/bin/activate"
+                        change_dir_command = f"cd {custom_node_path}"
+                        pip_install_command = "pip install -r requirements.txt"
+                        
+                        full_command = f"{activate_venv} && {change_dir_command} && {pip_install_command}"
+                        
+                        # TODO: rewrite this without shell
+                        process = subprocess.Popen(full_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, executable='/bin/bash')
+                        output, _ = process.communicate()
+                        
+                        if process.returncode == 0:
+                            return True, f"Custom node requirements were successfully installed. Output: {output.decode('utf-8')}"
+                        else:
+                            return False, f"Error in custom node requirements installation. Output: {output.decode('utf-8')}"
+                    except Exception as e:
+                        return False, f"Error installing custom node requirements: {str(e)}"
+                        
+
+    except git.exc.GitCommandError as e:
+        send_websocket_message('install_log', {'app_name': app_name, 'log': f'Error cloning repository: {str(e)}'})
+        return False, f"Error cloning repository: {str(e)}"
+    except Exception as e:
+        send_websocket_message('install_log', {'app_name': app_name, 'log': f'Error cloning repository: {str(e)}'})
+        return False, f"Error cloning repository: {str(e)}"
+
+
+    if app_name == 'bkohya': # create a folder link for kohya_ss local "venv"
+        success, message = ensure_kohya_local_venv_is_symlinked()
+        if not success: # symlink not created, but still success=True and only a warning, can be fixed manually
+            message = f"{app_config['name']} was cloned and patched successfully, but the symlink to the local venv returned following problem:\n{message}"
+    else:
+            message = f"'{app_name}' was cloned successfully."
+
+    return True, message
+
+def update_kohya_setup_sh(app_path:str) -> tuple[bool, str]:
+    try:
+        # patch 'setup.sh' within the kohya_ss main folder for BRANCH="sd3-flux.1"
+        setup_sh_path = os.path.join(app_path, 'setup.sh')
+        if not os.path.exists(setup_sh_path):
+            return False, f"file '{setup_sh_path}' was not found"
+
+        with open(setup_sh_path, 'r') as file:
+            content = file.read()
+
+        # Use regex to search & replace wrong branch variable in the file
+        patched_content = re.sub(r'BRANCH="master"', 'BRANCH="sd3-flux.1"', content)
+
+        if patched_content == content:
+            message = f"'{setup_sh_path}' already fine, patch not needed."
+        else:
+            with open(setup_sh_path, 'w') as file:
+                file.write(patched_content)
+
+            message = f"'{setup_sh_path}' needed patch, successfully patched."
+
+        return True, message
+    
+    except Exception as e:
+        return False, str(e)
+
+def download_and_unpack_venv_v1(app_name, app_configs, send_websocket_message):
     app_config = app_configs.get(app_name)
     if not app_config:
         return False, f"App '{app_name}' not found in configurations."
@@ -725,14 +872,14 @@ def download_and_unpack_venv(app_name, app_configs, send_websocket_message):
     venv_path = app_config['venv_path']
     app_path = app_config['app_path']
     download_url = app_config['download_url']
-    total_size = app_config['size']
+    archive_size = app_config['size']
     tar_filename = os.path.basename(download_url)
     workspace_dir = '/workspace'
     downloaded_file = os.path.join(workspace_dir, tar_filename)
 
     try:
         save_install_status(app_name, 'in_progress', 0, 'Downloading')
-        send_websocket_message('install_log', {'app_name': app_name, 'log': f'Starting download of {total_size / (1024 * 1024):.2f} MB...'})
+        send_websocket_message('install_log', {'app_name': app_name, 'log': f'Starting download of {archive_size / (1024 * 1024):.2f} MB...'})
 
         # lutzapps - debug with existing local TAR
         if not os.path.exists(downloaded_file):
@@ -753,8 +900,8 @@ def download_and_unpack_venv(app_name, app_configs, send_websocket_message):
                         
                         if elapsed_time > 0:
                             speed = downloaded_size / elapsed_time
-                            percentage = (downloaded_size / total_size) * 100
-                            eta = (total_size - downloaded_size) / speed if speed > 0 else 0
+                            percentage = (downloaded_size / archive_size) * 100
+                            eta = (archive_size - downloaded_size) / speed if speed > 0 else 0
                             
                             send_websocket_message('install_progress', {
                                 'app_name': app_name,
@@ -869,31 +1016,34 @@ def download_and_unpack_venv(app_name, app_configs, send_websocket_message):
         send_websocket_message('install_complete', {'app_name': app_name, 'status': 'error', 'message': error_message})
         return False, error_message
 
-### this is the function wgich switches between v0 and v1 debug setting for comparison
-def download_and_unpack_venv(app_name, app_configs, send_websocket_message) -> tuple[bool, str]:
-    from app_configs import DEBUG_SETTINGS, write_debug_setting
+### this is the function which switches between v0 and v1 debug setting for comparison
+def download_and_unpack_venv(app_name:str, app_configs:dict, send_websocket_message) -> tuple[bool, str]:
+    from utils.app_configs import DEBUG_SETTINGS, write_debug_setting
 
     installer_codeversion = DEBUG_SETTINGS['installer_codeversion'] # read from DEBUG_SETTINGS
-    print(f"download_and_unpack_venv v{installer_codeversion} STARTING for '{app_name}'")
+    print(f"download_and_unpack_venv_{installer_codeversion} STARTING for '{app_name}'")
 
     import time
 
     start_time = time.time()
           
-    if installer_codeversion == "1":
-        download_and_unpack_venv(app_name, app_configs, send_websocket_message)
-    elif installer_codeversion == "2":
-        download_and_unpack_venv_fastversion(app_name, app_configs, send_websocket_message)
+    if installer_codeversion == "v1":
+        success, message = download_and_unpack_venv_v1(app_name, app_configs, send_websocket_message)
+    elif installer_codeversion == "v2":
+        success, message = download_and_unpack_venv_v2(app_name, app_configs, send_websocket_message)
     else:
-        print(f"unknown 'installer_codeversion' v{installer_codeversion} found, nothing run for app '{app_name}'")
+        error_msg = f"unknown 'installer_codeversion' {installer_codeversion} found, nothing run for app '{app_name}'"
+        print(error_msg)
+        success = False
+        message = error_msg
 
     total_duration = f"{datetime.timedelta(seconds=int(time.time() - start_time))}"
 
     write_debug_setting('app_name', app_name)
     write_debug_setting('total_duration', total_duration)
 
-    print(f"download_and_unpack_venv v{installer_codeversion} did run {total_duration} for app '{app_name}'")
-
+    print(f"download_and_unpack_venv_v{installer_codeversion} did run {total_duration} for app '{app_name}'")
+    return success, message
 
 def fix_custom_nodes(app_name, app_configs):
     if app_name != 'bcomfy':
@@ -921,54 +1071,9 @@ def fix_custom_nodes(app_name, app_configs):
         return False, f"Error fixing custom nodes: {str(e)}"
 
 # Replace the existing install_app function with this updated version
-def install_app(app_name, app_configs, send_websocket_message):
+def install_app(app_name:str, app_configs:dict, send_websocket_message) -> tuple[bool, str]:
     if app_name in app_configs:
-        #return download_and_unpack_venv(app_name, app_configs, send_websocket_message)
-        return download_and_unpack_venv_fastversion(app_name, app_configs, send_websocket_message)
+        success, message = download_and_unpack_venv(app_name, app_configs, send_websocket_message)
+        return success, message
     else:
         return False, f"Unknown app: {app_name}"
-
-# unused function
-def onsolate_update_model_symlinks():
-    # lutzapps - CHANGE #7 - use the new "shared_models" module for app model sharing
-    # remove this whole now unused function
-    return "replaced by utils.shared_models.update_model_symlinks()"
-
-    shared_models_dir = '/workspace/shared_models'
-    apps = {
-        'stable-diffusion-webui': '/workspace/stable-diffusion-webui/models',
-        'stable-diffusion-webui-forge': '/workspace/stable-diffusion-webui-forge/models',
-        'ComfyUI': '/workspace/ComfyUI/models'
-    }
-    model_types = ['Stable-diffusion', 'VAE', 'Lora', 'ESRGAN']
-
-    for model_type in model_types:
-        shared_model_path = os.path.join(shared_models_dir, model_type)
-        
-        if not os.path.exists(shared_model_path):
-            continue
-
-        for app, app_models_dir in apps.items():
-            if app == 'ComfyUI':
-                if model_type == 'Stable-diffusion':
-                    app_model_path = os.path.join(app_models_dir, 'checkpoints')
-                elif model_type == 'Lora':
-                    app_model_path = os.path.join(app_models_dir, 'loras')
-                elif model_type == 'ESRGAN':
-                    app_model_path = os.path.join(app_models_dir, 'upscale_models')
-                else:
-                    app_model_path = os.path.join(app_models_dir, model_type.lower())
-            else:
-                app_model_path = os.path.join(app_models_dir, model_type)
-            
-            # Create the app model directory if it doesn't exist
-            os.makedirs(app_model_path, exist_ok=True)
-
-            # Create symlinks for each file in the shared model directory
-            for filename in os.listdir(shared_model_path):
-                src = os.path.join(shared_model_path, filename)
-                dst = os.path.join(app_model_path, filename)
-                if os.path.isfile(src) and not os.path.exists(dst):
-                    os.symlink(src, dst)
-
-    print("Model symlinks updated.")
