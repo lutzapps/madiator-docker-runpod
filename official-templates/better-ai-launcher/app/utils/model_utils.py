@@ -71,7 +71,7 @@ def check_huggingface_url(url):
     
     return True, repo_id, filename, folder_name, branch_name
 
-def download_model(url, model_name, model_type, civitai_token=None, hf_token=None, version_id=None, file_index=None):
+def download_model(url, model_name, model_type, civitai_token=None, hf_token=None, version_id=None, file_index=None) -> tuple[bool, str]:
     ensure_shared_folder_exists()
     is_civitai, is_civitai_api, model_id, _ = check_civitai_url(url)
     is_huggingface, repo_id, hf_filename, hf_folder_name, hf_branch_name = check_huggingface_url(url) # TODO: double call
@@ -95,7 +95,7 @@ def download_model(url, model_name, model_type, civitai_token=None, hf_token=Non
     return success, message
 
 # lutzapps - added SHA256 checks for already existing ident and downloaded HuggingFace model
-def download_civitai_model(url, model_name, model_type, civitai_token, version_id=None, file_index=None):
+def download_civitai_model(url, model_name, model_type, civitai_token, version_id=None, file_index=None) -> tuple[bool, str]:
     try:
         is_civitai, is_civitai_api, model_id, url_version_id = check_civitai_url(url)
         
@@ -186,7 +186,7 @@ def get_sha256_hash_from_file(file_path:str) -> tuple[bool, str]:
             for byte_block in iter(lambda: f.read(4096), b""):
                 sha256_hash.update(byte_block)
 
-        return True, sha256_hash.hexdigest().upper()
+        return True, sha256_hash.hexdigest().lower()
     
     except Exception as e:
         return False, str(e)
@@ -247,7 +247,7 @@ def get_modelfile_hash_and_ident_existing_modelfile_exists(model_name:str, model
                     raise NotImplementedError("Copying a non-LFS file is not implemented.")
                 
                 lfs = repo_file.lfs # BlobLfsInfo class instance
-                download_sha256_hash = lfs.sha256.upper()
+                download_sha256_hash = lfs.sha256.lower()
 
                 print(f"Metadata from RepoFile LFS '{repo_file.rfilename}'")
                 print(f"SHA256: {download_sha256_hash}")
@@ -283,8 +283,8 @@ def get_modelfile_hash_and_ident_existing_modelfile_exists(model_name:str, model
         # if NOT successful, the hash contains the Exception
         print(f"SHA256 hash generated from local file: '{model_path}'\n{model_sha256_hash}")
         
-        if successfull_HashGeneration and model_sha256_hash == download_sha256_hash:
-            message = f"Existing and ident model aleady found for '{os.path.basename(model_path)}'"
+        if successfull_HashGeneration and model_sha256_hash.lower() == download_sha256_hash.lower():
+            message = f"Existing and ident model already found for '{os.path.basename(model_path)}'"
             print(message)
 
             send_websocket_message('model_download_progress', {
@@ -315,7 +315,7 @@ def get_modelfile_hash_and_ident_existing_modelfile_exists(model_name:str, model
 
 
 # lutzapps - added SHA256 checks for already existing ident and downloaded HuggingFace model
-def download_huggingface_model(url, model_name, model_type, repo_id, hf_filename, hf_folder_name, hf_branch_name, hf_token=None):
+def download_huggingface_model(url, model_name, model_type, repo_id, hf_filename, hf_folder_name, hf_branch_name, hf_token=None) -> tuple[bool, str]:
     try:
         from huggingface_hub import hf_hub_download
 
@@ -372,7 +372,7 @@ def download_huggingface_model(url, model_name, model_type, repo_id, hf_filename
 
 
 # lutzapps - added SHA256 check for downloaded CivitAI model
-def download_file(url, download_sha256_hash, file_path, headers=None):
+def download_file(url, download_sha256_hash, file_path, headers=None) -> tuple[bool, str]:
     try:
         response = requests.get(url, stream=True, headers=headers)
         response.raise_for_status()
@@ -428,7 +428,7 @@ def check_downloaded_modelfile(model_path:str, download_sha256_hash:str, platfor
         })
 
         successfull_HashGeneration, model_sha256_hash = get_sha256_hash_from_file(model_path)
-        if successfull_HashGeneration and model_sha256_hash == download_sha256_hash:
+        if successfull_HashGeneration and model_sha256_hash.lower() == download_sha256_hash.lower():
             send_websocket_message('model_download_progress', {
                 'percentage': 100,
                 'stage': 'Complete',

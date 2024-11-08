@@ -2418,7 +2418,7 @@
                                                 <div class="download-info">
                                                     <span class="download-speed"></span>
                                                     <span class="download-eta"></span>
-                                                </div>4
+                                                </div><!-- 4 lutzapps - remove a typo "4" -->
                                                 <div class="install-stage"></div>
                                             </div>
                                         </div>
@@ -2838,6 +2838,7 @@
 
     function initializeUI() {
         updateStatus();
+        // TODO: need a way this 2 functions not pollute the logs every second or 5 seconds
         setInterval(updateStatus, 5000);
         setInterval(updateLogs, 1000);
 
@@ -3276,15 +3277,6 @@
 
         navigator.clipboard.writeText(modelUrl).then(() => {
             alert('URL copied to Downloader and into the Clipboard!');
-        }, (err) => {
-            console.error('Could not copy text: ', err);
-        });
-    }
-
-    // lutzapps - obsolete function (can be deleted)
-    function copyToClipboard(text) {
-        navigator.clipboard.writeText(text).then(() => {
-            alert('URL copied to clipboard!');
         }, (err) => {
             console.error('Could not copy text: ', err);
         });

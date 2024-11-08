@@ -7,22 +7,75 @@ FROM ${BASE_IMAGE:-madiator2011/better-base:cuda12.4} AS base
 ARG BASE_IMAGE
 ENV BASE_IMAGE=$BASE_IMAGE
 
+# lutzapps - replaced by above bake build-args
 #FROM madiator2011/better-base:cuda12.4 AS base
 
 # lutzapps - prepare for local developement and debugging
 # needed to change the ORDER of "apt-get commands" and move the "update-alternatives" for python3
 # AFTER the "apt-get remove -y python3.10" cmd, OTHERWISE the symlink to python3
 # is broken in the image and the VSCode debugger could not exec "python3" as CMD overwrite
+# also fixed a boring "Blinker" blocking error
 
-# Install Python 3.11, set it as default, and remove Python 3.10
 RUN apt-get update && \
+    ### ---> needed Tools for Installer
     # removed: 2x git nginx ffmpeg (as they are already installed with the base image)
     # added: pigz (for parallel execution of TAR files); zip (for easier folder compression)
-    apt-get install -y python3.11 python3.11-venv python3.11-dev python3.11-distutils \
-    aria2 pigz zip pv rsync zstd libtcmalloc-minimal4 bc && \
-    apt-get remove -y python3.10 python3.10-minimal libpython3.10-minimal libpython3.10-stdlib && \
+    apt-get install -y aria2 pigz zip pv rsync zstd libtcmalloc-minimal4 bc \
+    # add Python3.11 as system Python version, serving the Python Flask App
+    python3.11 python3.11-venv python3.11-dev python3.11-distutils && \
+    # not remove Python3.10, as we need it for "official" app support (e.g. for kohya_ss VENV)
+    ###apt-get remove -y python3.10 python3.10-minimal libpython3.10-minimal libpython3.10-stdlib && \
+    #
+    # setup an "alias" for "python" be symlinked to Python3.11
+    # (which is the default anyway after this installation here of Python 3.11)
     update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
+    #
+    # setup the "python3" alias for Python3.11, as this is what the debugger needs (not work with 3.10)
     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
+    #
+    # VENV will have their own "preferred/supported/recommended" Python version, as e.g.
+    # the "kohya_ss" app, only supports Python up to version 3.10 (but not 3.11)
+    #
+    # until here we have a broken "Blinker" installation from some base images before,
+    # and if we try to "update" "Blinker" for Python3.10 or via e.g. "pip install --upgrade blinker",
+    # or "pip install blinker==x.y.z.z", this breaks, as it was installed in an APT bundle,
+    # which can not be safely upgraded (= Uninstall/Reinstall)! It breaks as follows:
+    # we get a blinker 1.4 uninstall error chained by trying to uninstall "distutils":
+    #    8.568     Found existing installation: blinker 1.4
+    #    8.782 error: uninstall-distutils-installed-package
+    #    8.782 
+    #    8.782 × Cannot uninstall blinker 1.4
+    #    8.782 ╰─> It is a distutils installed project and thus we cannot accurately determine which files belong to it which would lead to only a partial uninstall.
+    # that not only blocks building the docker image, but later also breaks the "kohya_ss" app during setup,
+    # which try to install Blinker and Python310-venv from "setup-runpod.sh":
+    #   # Install tk and python3.10-venv
+    #   echo "Installing tk and python3.10-venv..."
+    #   apt update -y && apt install -y python3-tk python3.10-venv
+    #
+    # Python 3.10 needs to run as Kohya's "official" requirement, and is used in the VENV
+    #
+    # first uninstall the APT bundle package for "Blinker"
+    apt-get remove -y python3-blinker && \
+    # then re-install the APT unbundled package of "Blinker back",
+    # together with Python3.10 venv, which we need to setup the kohya_ss VENV
+    apt-get install -y python3-tk python3.10-venv && \
+    # this re-captures back the "python3" alias for Python3.10, but not the "python" alias (stays for Python3.11)
+    # the "Python3.11" and "Python3.10" cmds work too
+    # global PIP is 3.11, VENV pip is 3.10
+    #
+    # ---> CUDA 12.4 Toolkit (is already in the 12.4 base-image)
+    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb && \
+    dpkg -i cuda-keyring_1.1-1_all.deb && \
+    ### need to refresh the repository metatdata, after downloading this NVIDIA downloaded package list!!!
+    apt-get update && \
+    apt-get -y install cuda-toolkit-12-4 && \
+    #
+    # ---> get the latest cuDNN 9.x version supporting CUDA 12.x
+    # remove the current dev package which depends on libcudnn9-cuda-12 and breaks the upgrade otherwise
+    apt-get remove -y --allow-change-held-packages libcudnn9-cuda-12 libcudnn9-dev-cuda-12 && \
+    apt-get -y --allow-change-held-packages install cudnn-cuda-12 && \
+    #
+    # clean-up resources and caches
     apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*

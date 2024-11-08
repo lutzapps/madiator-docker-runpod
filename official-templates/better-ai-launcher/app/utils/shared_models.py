@@ -6,7 +6,7 @@ import time
 
 from flask import jsonify
 from utils.websocket_utils import (send_websocket_message, active_websockets)
-from utils.app_configs import (get_app_configs, init_global_dict_from_file, pretty_dict)
+from utils.app_configs import (get_app_configs, load_global_dict_from_file, pretty_dict)
 
 ### shared_models-v0.9.2 by lutzapps, Nov 5th 2024 ###
 
@@ -189,7 +189,9 @@ SHARED_MODEL_FOLDERS = {
 # helper function called by "inline"-main() and ensure_shared_models_folders()
 def init_shared_models_folders(send_SocketMessage:bool=True):
     global SHARED_MODEL_FOLDERS
-    init_global_dict_from_file(SHARED_MODEL_FOLDERS, SHARED_MODEL_FOLDERS_FILE, "SHARED_MODEL_FOLDERS", SHARED_MODELS_DIR)
+    success, dict = load_global_dict_from_file(SHARED_MODEL_FOLDERS, SHARED_MODEL_FOLDERS_FILE, "SHARED_MODEL_FOLDERS", SHARED_MODELS_DIR)
+    if success:
+        SHARED_MODEL_FOLDERS = dict
 
     if os.path.exists(SHARED_MODEL_FOLDERS_FILE) and send_SocketMessage:
         send_websocket_message('extend_ui_helper', {
@@ -341,7 +343,9 @@ def sync_with_app_configs_install_dirs():
 # NOTE: this APP_INSTALL_DIRS_FILE is temporary synced with the app_configs dict
 def init_app_install_dirs():
     global APP_INSTALL_DIRS
-    init_global_dict_from_file(APP_INSTALL_DIRS, APP_INSTALL_DIRS_FILE, "APP_INSTALL_DIRS", SHARED_MODELS_DIR)
+    success, dict = load_global_dict_from_file(APP_INSTALL_DIRS, APP_INSTALL_DIRS_FILE, "APP_INSTALL_DIRS", SHARED_MODELS_DIR)
+    if success:
+        APP_INSTALL_DIRS = dict
 
     return
 
@@ -496,7 +500,9 @@ SHARED_MODEL_APP_MAP = {
 # which does a default mapping from app code or (if exists) from external JSON 'SHARED_MODEL_APP_MAP_FILE' file
 def init_shared_model_app_map():
     global SHARED_MODEL_APP_MAP
-    init_global_dict_from_file(SHARED_MODEL_APP_MAP, SHARED_MODEL_APP_MAP_FILE, "SHARED_MODEL_APP_MAP", SHARED_MODELS_DIR)
+    success, dict = load_global_dict_from_file(SHARED_MODEL_APP_MAP, SHARED_MODEL_APP_MAP_FILE, "SHARED_MODEL_APP_MAP", SHARED_MODELS_DIR)
+    if success:
+        SHARED_MODEL_APP_MAP = dict
 
     return
 

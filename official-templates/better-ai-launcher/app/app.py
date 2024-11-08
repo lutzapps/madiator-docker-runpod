@@ -28,8 +28,7 @@ from utils.shared_models import (
     SHARED_MODELS_DIR, SHARED_MODEL_FOLDERS, SHARED_MODEL_FOLDERS_FILE, ensure_shared_models_folders,
     APP_INSTALL_DIRS, APP_INSTALL_DIRS_FILE, init_app_install_dirs, # APP_INSTALL_DIRS dict/file/function
     MAP_APPS, sync_with_app_configs_install_dirs, # internal MAP_APPS dict and sync function
-    SHARED_MODEL_APP_MAP, SHARED_MODEL_APP_MAP_FILE, init_shared_model_app_map, # SHARED_MODEL_APP_MAP dict/file/function
-    write_dict_to_jsonfile, read_dict_from_jsonfile, PrettyDICT # JSON helper functions
+    SHARED_MODEL_APP_MAP, SHARED_MODEL_APP_MAP_FILE, init_shared_model_app_map # SHARED_MODEL_APP_MAP dict/file/function
 )
 # the "update_model_symlinks()" function replaces the app.py function with the same same
 # and redirects to same function name "update_model_symlinks()" in the new "utils.shared_models" module
@@ -340,92 +339,12 @@ def remove_existing_app_config(app_name):
         return jsonify({'status': 'success', 'message': f'App {app_name} removed successfully'})
     return jsonify({'status': 'error', 'message': f'App {app_name} not found'})
 
-# unused function
-def obsolate_update_model_symlinks():
-    # lutzapps - CHANGE #3 - use the new "shared_models" module for app model sharing
-    # remove this whole now unused function
-    return "replaced by utils.shared_models.update_model_symlinks()"
-
 # modified function
 def setup_shared_models():
     # lutzapps - CHANGE #4 - use the new "shared_models" module for app model sharing
     jsonResult = update_model_symlinks()
 
     return SHARED_MODELS_DIR # shared_models_dir is now owned and managed by the "shared_models" utils module
-    # remove below unused code
-    
-    shared_models_dir = '/workspace/shared_models'
-    model_types = ['Stable-diffusion', 'VAE', 'Lora', 'ESRGAN']
-
-    # Create shared models directory if it doesn't exist
-    os.makedirs(shared_models_dir, exist_ok=True)
-
-    for model_type in model_types:
-        shared_model_path = os.path.join(shared_models_dir, model_type)
-        
-        # Create shared model type directory if it doesn't exist
-        os.makedirs(shared_model_path, exist_ok=True)
-
-    # Create a README file in the shared models directory
-    readme_path = os.path.join(shared_models_dir, 'README.txt')
-    if not os.path.exists(readme_path):
-        with open(readme_path, 'w') as f:
-            f.write("Upload your models to the appropriate folders:\n\n")
-            f.write("- Stable-diffusion: for Stable Diffusion models\n")
-            f.write("- VAE: for VAE models\n")
-            f.write("- Lora: for LoRA models\n")
-            f.write("- ESRGAN: for ESRGAN upscaling models\n\n")
-            f.write("These models will be automatically linked to all supported apps.")
-
-    print(f"Shared models directory created at {shared_models_dir}")
-    print("Shared models setup completed.")
-
-    return shared_models_dir
-
-# unused function
-def obsolate_update_model_symlinks():
-    # lutzapps - CHANGE #5 - use the new "shared_models" module for app model sharing
-    # remove this whole now unused function
-    return "replaced by utils.shared_models.update_model_symlinks()"
-
-    shared_models_dir = '/workspace/shared_models'
-    apps = {
-        'stable-diffusion-webui': '/workspace/stable-diffusion-webui/models',
-        'stable-diffusion-webui-forge': '/workspace/stable-diffusion-webui-forge/models',
-        'ComfyUI': '/workspace/ComfyUI/models'
-    }
-    model_types = ['Stable-diffusion', 'VAE', 'Lora', 'ESRGAN']
-
-    for model_type in model_types:
-        shared_model_path = os.path.join(shared_models_dir, model_type)
-        
-        if not os.path.exists(shared_model_path):
-            continue
-
-        for app, app_models_dir in apps.items():
-            if app == 'ComfyUI':
-                if model_type == 'Stable-diffusion':
-                    app_model_path = os.path.join(app_models_dir, 'checkpoints')
-                elif model_type == 'Lora':
-                    app_model_path = os.path.join(app_models_dir, 'loras')
-                elif model_type == 'ESRGAN':
-                    app_model_path = os.path.join(app_models_dir, 'upscale_models')
-                else:
-                    app_model_path = os.path.join(app_models_dir, model_type.lower())
-            else:
-                app_model_path = os.path.join(app_models_dir, model_type)
-            
-            # Create the app model directory if it doesn't exist
-            os.makedirs(app_model_path, exist_ok=True)
-
-            # Create symlinks for each file in the shared model directory
-            for filename in os.listdir(shared_model_path):
-                src = os.path.join(shared_model_path, filename)
-                dst = os.path.join(app_model_path, filename)
-                if os.path.isfile(src) and not os.path.exists(dst):
-                    os.symlink(src, dst)
-
-    print("Model symlinks updated.")
 
 def update_symlinks_periodically():
     while True: 
@@ -436,57 +355,6 @@ def start_symlink_update_thread():
     thread = threading.Thread(target=update_symlinks_periodically, daemon=True)
     thread.start()
 
-# unused function
-def obsolate_recreate_symlinks():
-    # lutzapps - CHANGE #6 - use the new "shared_models" module for app model sharing
-    # remove this whole now unused function
-    return "replaced by utils.shared_models.update_model_symlinks()"
-
-    shared_models_dir = '/workspace/shared_models'
-    apps = {
-        'stable-diffusion-webui': '/workspace/stable-diffusion-webui/models',
-        'stable-diffusion-webui-forge': '/workspace/stable-diffusion-webui-forge/models',
-        'ComfyUI': '/workspace/ComfyUI/models'
-    }
-    model_types = ['Stable-diffusion', 'VAE', 'Lora', 'ESRGAN']
-
-    for model_type in model_types:
-        shared_model_path = os.path.join(shared_models_dir, model_type)
-        
-        if not os.path.exists(shared_model_path):
-            continue
-
-        for app, app_models_dir in apps.items():
-            if app == 'ComfyUI':
-                if model_type == 'Stable-diffusion':
-                    app_model_path = os.path.join(app_models_dir, 'checkpoints')
-                elif model_type == 'Lora':
-                    app_model_path = os.path.join(app_models_dir, 'loras')
-                elif model_type == 'ESRGAN':
-                    app_model_path = os.path.join(app_models_dir, 'upscale_models')
-                else:
-                    app_model_path = os.path.join(app_models_dir, model_type.lower())
-            else:
-                app_model_path = os.path.join(app_models_dir, model_type)
-            
-            # Remove existing symlinks
-            if os.path.islink(app_model_path):
-                os.unlink(app_model_path)
-            elif os.path.isdir(app_model_path):
-                shutil.rmtree(app_model_path)
-            
-            # Create the app model directory if it doesn't exist
-            os.makedirs(app_model_path, exist_ok=True)
-
-            # Create symlinks for each file in the shared model directory
-            for filename in os.listdir(shared_model_path):
-                src = os.path.join(shared_model_path, filename)
-                dst = os.path.join(app_model_path, filename)
-                if os.path.isfile(src) and not os.path.exists(dst):
-                    os.symlink(src, dst)
-
-    return "Symlinks recreated successfully."
-
 # modified function
 @app.route('/recreate_symlinks', methods=['POST'])
 def recreate_symlinks_route():
@@ -494,13 +362,6 @@ def recreate_symlinks_route():
     jsonResult = update_model_symlinks()
 
     return jsonResult
-    # remove below unused code
-
-    try:
-        message = recreate_symlinks()
-        return jsonify({'status': 'success', 'message': message})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
 
 # modified function
 @app.route('/create_shared_folders', methods=['POST'])
@@ -508,39 +369,6 @@ def create_shared_folders():
     # lutzapps - CHANGE #8 - use the new "shared_models" module for app model sharing
     jsonResult = ensure_shared_models_folders()
     return jsonResult
-    # remove below unused code
-
-    try:
-        shared_models_dir = '/workspace/shared_models'
-        model_types = ['Stable-diffusion', 'Lora', 'embeddings', 'VAE', 'hypernetworks', 'aesthetic_embeddings', 'controlnet', 'ESRGAN']
-
-        # Create shared models directory if it doesn't exist
-        os.makedirs(shared_models_dir, exist_ok=True)
-
-        for model_type in model_types:
-            shared_model_path = os.path.join(shared_models_dir, model_type)
-            
-            # Create shared model type directory if it doesn't exist
-            os.makedirs(shared_model_path, exist_ok=True)
-
-        # Create a README file in the shared models directory
-        readme_path = os.path.join(shared_models_dir, 'README.txt')
-        if not os.path.exists(readme_path):
-            with open(readme_path, 'w') as f:
-                f.write("Upload your models to the appropriate folders:\n\n")
-                f.write("- Stable-diffusion: for Stable Diffusion checkpoints\n")
-                f.write("- Lora: for LoRA models\n")
-                f.write("- embeddings: for Textual Inversion embeddings\n")
-                f.write("- VAE: for VAE models\n")
-                f.write("- hypernetworks: for Hypernetwork models\n")
-                f.write("- aesthetic_embeddings: for Aesthetic Gradient embeddings\n")
-                f.write("- controlnet: for ControlNet models\n")
-                f.write("- ESRGAN: for ESRGAN upscaling models\n\n")
-                f.write("These models will be automatically linked to all supported apps.")
-
-        return jsonify({'status': 'success', 'message': 'Shared model folders created successfully.'})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
 
 def save_civitai_token(token):
     with open(CIVITAI_TOKEN_FILE, 'w') as f:
@@ -644,7 +472,7 @@ def get_model_types_route():
             'desc': model_type_description
         }
 
-        i = i + 1
+        i += 1
     
     return model_types_dict
 
