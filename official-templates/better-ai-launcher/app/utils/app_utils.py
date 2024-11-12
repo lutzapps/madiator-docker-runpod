@@ -13,10 +13,18 @@ import xml.etree.ElementTree as ET
 import time
 import datetime
 import shutil
-from utils.app_configs import (DEBUG_SETTINGS, pretty_dict, init_app_configs, init_debug_settings, write_debug_setting, ensure_kohya_local_venv_is_symlinked)
+from utils.app_configs import (app_configs, DEBUG_SETTINGS, pretty_dict, init_app_configs, init_debug_settings, write_debug_setting, ensure_kohya_local_venv_is_symlinked)
 from utils.model_utils import (get_sha256_hash_from_file)
 
 INSTALL_STATUS_FILE = '/tmp/install_status.json'
+
+# lutzapps - support for bkohya gradio url
+BKOHYA_LAUNCH_URL = "" # will be captured during run_app('bkohya', ...) from bkohya log
+# e.g. https://85f6f17d6d725c6cde.gradio.live
+
+def get_bkohya_launch_url() -> str:
+    global BKOHYA_LAUNCH_URL
+    return BKOHYA_LAUNCH_URL
 
 def is_process_running(pid):
     try:
@@ -33,8 +41,33 @@ def run_app(app_name, command, running_processes):
         'log': [],
         'status': 'running'
     }
+
+    # lutzapps - capture the gradio-url for bkohya app
+    global BKOHYA_LAUNCH_URL
+
+    BKOHYA_LAUNCH_URL = "" # will be captured during run_app('bkohya', ...) from bkohya log
+    # e.g. https://85f6f17d6d725c6cde.gradio.live
     
     for line in process.stdout:
+        # wait for gradio-url in bkohya log (the --share option generates a gradio url)
+        if app_name == 'bkohya' and BKOHYA_LAUNCH_URL == "":
+            gradio_mode = ("--share" in command.lower())
+            if gradio_mode and ".gradio.live" in line:
+                # get the gradio url from the log line
+                # line = '* Running on public URL: https://85f6f17d6d725c6cde.gradio.live\n'
+                gradio_url_pattern = r"https://([\w.-]+(?:\.[\w.-]+)+)"
+
+                match = re.search(gradio_url_pattern, line)
+                if match:
+                    BKOHYA_LAUNCH_URL = match.group(0)  # Full URL, e.g., "https://85f6f17d6d725c6cde.gradio.live"
+                    print(f"Public Gradio-URL found in bkohya log: {BKOHYA_LAUNCH_URL}")
+
+            elif not gradio_mode and "127.0.0.1" in line: # only wait for this when gradio_mode = False (=local URL mode)
+                port = app_configs[app_name]['port'] # read the configured port from app_configs
+                # line = '* Running on local URL: http://127.0.0.1:7864
+                BKOHYA_LAUNCH_URL = f"http://127.0.0.1:{port}"
+                print(f"Local-URL found in bkohya log: {BKOHYA_LAUNCH_URL}")
+
         running_processes[app_name]['log'].append(line.strip())
         if len(running_processes[app_name]['log']) > 1000:
             running_processes[app_name]['log'] = running_processes[app_name]['log'][-1000:]

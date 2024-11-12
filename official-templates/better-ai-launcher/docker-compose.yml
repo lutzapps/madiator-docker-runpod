@@ -19,6 +19,6 @@ services:
 
       - 3000:3000 # ComfyUI
       - 6006:6006 # Tensorboard (needed by kohya_ss)
-      - 7860:7860 # Kohya-ss (lutzapps - added new Kohya app with FLUX support)
       - 7862:7862 # Forge (aka Stable-Diffiusion-WebUI-Forge)
       - 7863:7863 # A1111 (aka Stable-Diffiusion-WebUI)
+      - 7864:7864 # Kohya-ss (lutzapps - added new Kohya app with FLUX support)

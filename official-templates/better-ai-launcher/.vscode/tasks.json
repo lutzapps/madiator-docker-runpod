@@ -75,16 +75,16 @@
 						"hostPort": 6006
 					},
 					{
-						"containerPort": 7860, // Kohya-ss (lutzapps - added new Kohya app with FLUX support)
-						"hostPort": 7860
-					},
-					{
 						"containerPort": 7862, // Forge (aka Stable-Diffiusion-WebUI-Forge)
 						"hostPort": 7862
 					},
 					{
 						"containerPort": 7863, // A1111 (aka Stable-Diffiusion-WebUI)
 						"hostPort": 7863
+					},
+					{
+						"containerPort": 7864, // Kohya-ss (lutzapps - added new Kohya app with FLUX support)
+						"hostPort": 7864
 					}
 				]
 			},

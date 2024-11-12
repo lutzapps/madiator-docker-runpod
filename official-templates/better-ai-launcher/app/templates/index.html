@@ -2768,16 +2768,47 @@
         await updateStatus();
     }
 
-    function openApp(appKey, port) {
-        // *** lutzapps - Change #3 - support to run locally
+    async function openApp(appKey, port) {
+        // *** lutzapps - support to run locally and new support for bkohya gradio url
         // NOTE: ` (back-ticks) are used here for template literals
         var url = `https://${podId}-${port}.proxy.runpod.net/`; // need to be declared as var
         if (`${enable_unsecure_localhost}` === 'True') {
             url = `http://localhost:${port}/`; // remove runpod.net proxy
-            //alert(`openApp URL=${url}`);
         }
 
-        window.open(url, '_blank');
+        // new: support gradio url for kohya_ss, e.g. https://b6365c256c395e755b.gradio.live
+        //if (`${appKey}` === 'bkohya' && `${app_status[appKey]['status']}` === 'running') { // get the latest data from the server
+        if (appKey == 'bkohya') { // get the latest data from the server
+            var response = await fetch('/get_bkohya_launch_url');
+            var result = await response.json();
+            
+            var launch_mode = result['mode']; // 'gradio' or 'local'
+            //alert('launch_mode=' + launch_mode);
+
+            var launch_url = result['url'];
+            //alert('launch_url=' + launch_url);
+
+            if (launch_url !== '') { // when a launch url is defined, the app is initialized and ready to be opened
+                if (launch_mode === 'gradio') { // if it is a gradio url
+                    url = launch_url; // then use it, instead of the above defined CF proxy url
+                    //alert('using gradio for bkohya: ' + launch_url);
+                }
+                // else use the CF proxy url defined above for localhost, instead of the localhost url from the log
+            }   
+            else { // empty launch_url, waiting for launch url from log
+                if (launch_mode === 'gradio') {
+                    alert('Waiting for Gradio URL to be generated ...');
+                }
+                else {
+                    alert('Waiting for lokal Launch URL to be generated ...');
+                }
+                return; // no lauch Url yet
+            }
+        }
+
+        //alert(`openApp URL=${url}`);
+
+        window.open(url, '_blank'); // open app window as popup window
     }
 
     async function updateStatus() {

@@ -62,9 +62,9 @@ BASE_IMAGE=madiator2011/better-base:cuda12.4
 
 - 3000/http (ComfyUI)
 - 6006/http (Tensorboard [needed by kohya_ss])
-- 7860/http (Kohya-ss) with FLUX.1 support
 - 7862/http (Forge) aka Stable-Diffiusion-WebUI-Forge
 - 7863/http (A1111) aka Stable-Diffiusion-WebUI
+- 7864/http (Kohya-ss) with FLUX.1 support
 
 ## ENV Vars (System)
 
