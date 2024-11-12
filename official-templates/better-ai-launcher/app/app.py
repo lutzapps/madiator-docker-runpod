@@ -223,40 +223,54 @@ def force_kill_app(app_name):
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
+from gevent.lock import RLock
+websocket_lock = RLock()
+
 @sock.route('/ws')
 def websocket(ws):
-    active_websockets.add(ws)
+    with websocket_lock:
+        active_websockets.add(ws)
     try:
-        while True:
-            message = ws.receive()
-            data = json.loads(message)
-            
-            if data['type'] == 'heartbeat':
-                ws.send(json.dumps({'type': 'heartbeat'}))
-            else:
-                # Handle other message types
-                pass
+        while ws.connected:  # Check connection status
+            try:
+                message = ws.receive(timeout=70)  # Add timeout slightly higher than heartbeat
+                if message:
+                    data = json.loads(message)
+                    if data['type'] == 'heartbeat':
+                        ws.send(json.dumps({'type': 'heartbeat'}))
+                    else:
+                        # Handle other message types
+                        pass
+            except Exception as e:
+                if "timed out" in str(e).lower():
+                    # Handle timeout gracefully
+                    continue
+                print(f"Error handling websocket message: {str(e)}")
+                if not ws.connected:
+                    break
+                continue
     except Exception as e:
         print(f"WebSocket error: {str(e)}")
     finally:
-        active_websockets.remove(ws)
+        with websocket_lock:
+            try:
+                active_websockets.remove(ws)
+            except KeyError:
+                pass
 
 def send_heartbeat():
-    initial_interval = 5  # 5 seconds
-    max_interval = 60  # 60 seconds
-    current_interval = initial_interval
-    start_time = time.time()
-
     while True:
-        time.sleep(current_interval)
-        send_websocket_message('heartbeat', {})
-        
-        # Gradually increase the interval
-        elapsed_time = time.time() - start_time
-        if elapsed_time < 60:  # First minute
-            current_interval = min(current_interval * 1.5, max_interval)
-        else:
-            current_interval = max_interval
+        try:
+            time.sleep(60)  # Fixed 60 second interval
+            with websocket_lock:
+                for ws in list(active_websockets):  # Create a copy of the set
+                    try:
+                        if ws.connected:
+                            ws.send(json.dumps({'type': 'heartbeat', 'data': {}}))
+                    except Exception as e:
+                        print(f"Error sending heartbeat: {str(e)}")
+        except Exception as e:
+            print(f"Error in heartbeat thread: {str(e)}")
 
 # Start heartbeat thread
 threading.Thread(target=send_heartbeat, daemon=True).start()
@@ -264,7 +278,15 @@ threading.Thread(target=send_heartbeat, daemon=True).start()
 @app.route('/install/<app_name>', methods=['POST'])
 def install_app_route(app_name):
     try:
-        success, message = install_app(app_name, app_configs, send_websocket_message)
+        def progress_callback(message_type, message_data):
+            try:
+                send_websocket_message(message_type, message_data)
+            except Exception as e:
+                print(f"Error sending progress update: {str(e)}")
+                # Continue even if websocket fails
+                pass
+
+        success, message = install_app(app_name, app_configs, progress_callback)
         if success:
             return jsonify({'status': 'success', 'message': message})
         else:
@@ -335,7 +357,12 @@ def stop_filebrowser_route():
 
 @app.route('/filebrowser_status')
 def filebrowser_status_route():
-    return jsonify({'status': get_filebrowser_status()})
+    try:
+        status = get_filebrowser_status()
+        return jsonify({'status': status if status else 'unknown'})
+    except Exception as e:
+        app.logger.error(f"Error getting filebrowser status: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/add_app_config', methods=['POST'])
 def add_new_app_config():

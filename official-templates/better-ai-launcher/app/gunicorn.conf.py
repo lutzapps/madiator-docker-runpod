@@ -5,7 +5,7 @@ import multiprocessing
 workers = multiprocessing.cpu_count() * 2 + 1
 worker_class = 'geventwebsocket.gunicorn.workers.GeventWebSocketWorker'
 worker_connections = 1000
-timeout = 300
+timeout = 0  # Disable timeout completely
 
 # Server socket
 bind = '0.0.0.0:7222'

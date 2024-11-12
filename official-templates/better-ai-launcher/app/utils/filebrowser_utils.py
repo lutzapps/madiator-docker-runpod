@@ -1,5 +1,7 @@
 import subprocess
 import time
+import requests
+from requests.exceptions import Timeout
 
 FILEBROWSER_PORT = 8181
 filebrowser_process = None
@@ -35,4 +37,10 @@ def stop_filebrowser():
     return False
 
 def get_filebrowser_status():
-    return 'running' if filebrowser_process and filebrowser_process.poll() is None else 'stopped'
+    try:
+        response = requests.get('http://localhost:7222/fileapp/', timeout=5)
+        return 'running' if response.status_code == 200 else 'stopped'
+    except Timeout:
+        return 'timeout'
+    except Exception:
+        return 'unknown'

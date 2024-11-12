@@ -2640,6 +2640,8 @@
             document.getElementById('loadingOverlay').style.display = 'none';
             reconnectAttempts = 0;
             initializeUI();
+            // Start sending heartbeats immediately after connection
+            startHeartbeat();
         };
 
         socket.onmessage = function(event) {
@@ -2648,7 +2650,8 @@
                 console.log(`Data received from server:`, data);
                 
                 if (data.type === 'heartbeat') {
-                    sendWebSocketMessage('heartbeat', {});
+                    // Reset heartbeat timeout on receiving heartbeat response
+                    resetHeartbeatTimeout();
                 } else if (data.type === 'model_download_progress') {
                     updateModelDownloadProgress(data.data);
                 } else if (data.type === 'status_update') {
@@ -2675,14 +2678,70 @@
         };
     }
 
+    let heartbeatInterval;
+    let heartbeatTimeout;
+
+    function startHeartbeat() {
+        // Clear any existing intervals
+        if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+        }
+        
+        // Send heartbeat every 60 seconds
+        heartbeatInterval = setInterval(() => {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'heartbeat' }));
+                // Set timeout to reconnect if no response within 10 seconds
+                setHeartbeatTimeout();
+            }
+        }, 60000);
+    }
+
+    function setHeartbeatTimeout() {
+        if (heartbeatTimeout) {
+            clearTimeout(heartbeatTimeout);
+        }
+        heartbeatTimeout = setTimeout(() => {
+            console.log("Heartbeat timeout - attempting reconnect...");
+            if (socket) {
+                socket.close();
+            }
+            handleReconnect();
+        }, 65000); // Increased timeout to 65 seconds
+    }
+
+    function resetHeartbeatTimeout() {
+        if (heartbeatTimeout) {
+            clearTimeout(heartbeatTimeout);
+        }
+    }
+
+    // Clean up on page unload
+    window.addEventListener('beforeunload', () => {
+        if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+        }
+        if (heartbeatTimeout) {
+            clearTimeout(heartbeatTimeout);
+        }
+        if (socket) {
+            socket.close();
+        }
+    });
+
     function handleReconnect() {
         if (reconnectAttempts < maxReconnectAttempts) {
             reconnectAttempts++;
             document.getElementById('loadingOverlay').style.display = 'flex';
-            document.getElementById('loadingMessage').textContent = `WebSocket disconnected. Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`;
-            setTimeout(connectWebSocket, reconnectInterval);
+            document.getElementById('loadingMessage').textContent = 
+                `WebSocket disconnected. Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`;
+            
+            // Add exponential backoff
+            const backoffTime = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+            setTimeout(connectWebSocket, backoffTime);
         } else {
-            document.getElementById('loadingMessage').textContent = 'Failed to connect to WebSocket. Please refresh the page or contact support.';
+            document.getElementById('loadingMessage').textContent = 
+                'Failed to connect to WebSocket. Installation continues in background. Please refresh page to see status.';
         }
     }
 
@@ -2873,9 +2932,14 @@
         setInterval(updateStatus, 5000);
         setInterval(updateLogs, 1000);
 
+        // Initialize model types
+        refreshModelTypes();
+    }
+
+    async function refreshModelTypes() {
         var data = {};
         data.cmd = 'refreshModelTypes';
-        extendUIHelper(data); // lutzapps - initialize the available SHARED_MODEL_FOLDERS for the "Model Downloader" modelType select list
+        await extendUIHelper(data); // lutzapps - initialize the available SHARED_MODEL_FOLDERS for the "Model Downloader" modelType select list
     }
 
     // lutzapps - populate modeltype select options from shared_models
@@ -2933,53 +2997,49 @@
             case "refreshModelTypes":
                 // refresh and optionally select the 'modelType' list for "Model Downloader"
                 var modelTypeSelect = document.getElementById('modelType');
-
-                // get the data from the Server
-                response = await fetch('/get_model_types');
-                result = await response.json();
-
-                //alert(JSON.stringify(result)); // show the JSON-String
-                var model_types = result; // get the JSON-Object
-                var count = Object.keys(model_types).length; // count=18, when using the default SHARED_MODEL_FOLDERS dict
-
-                // the "/get_model_types" app.get_model_types_route() function checks
-                // if the SHARED_MODELS_DIR shared files already exists at the "/workspace" location.
-                // that only happens AFTER the the user clicked the "Create Shared Folders" button
-                // on the "Settings" Tab of the app's WebUI.
-                // it will return an empty model_types_dict, so the "Download Manager" does NOT get
-                // the already in-memory SHARED_MODEL_FOLDERS code-generated default dict
-                // BEFORE the workspace folders in SHARED_MODELS_DIR exists!
-                //
-                // when SHARED_MODELS_DIR exists (or updates), this function will be called via a Socket Message
-                // to "refresh" its content automatically
-
-                var modelTypeSelected = modelTypeSelect.value; // remember the current selected modelType.option value
-                modelTypeSelect.options.length = 0; // clear all current modelTypeSelect options
-
-                for (i = 0 ; i < count; i += 1) {
-                    modelTypeOption = document.createElement('option');
-
-                    modelType = model_types[String(i)]['modelfolder'];
-                    modelTypeOption.setAttribute('value', modelType);
-                    modelTypeOption.appendChild(document.createTextNode(model_types[String(i)]['desc']));
-                    //if (modelFolder === modelTypeSelected) {
-                    //    modelTypeOption.selected = true; // reselect it
-                    //}
-
-                    modelTypeSelect.appendChild(modelTypeOption);
+                if (!modelTypeSelect) {
+                    console.error('Model type select element not found');
+                    return;
                 }
 
-                //modelTypeSelect.selectedIndex = modelfolder_index; // set the selected index
-                //modelTypeSelect.options[mmodelfolder_index].selected = true; // and mark it as "selected" option
-                if (modelTypeSelected === "") { // initial refresh, called by initializeUI() function
-                    modelTypeSelect.selectedIndex = 0; // use the first modelType option, usually "ckpt"
-                    MODELTYPE_SELECTED = modelTypeSelect.options[0].value; // NOT handled by the onchange() event handler
-                }
-                else {
-                    modelTypeSelect.value = modelTypeSelected; // (re-)apply the selected modelType option
-                    MODELTYPE_SELECTED = modelTypeSelected; // NOT handled by the onchange() event handler
-                }
+                try {
+                    // get the data from the Server
+                    response = await fetch('/get_model_types');
+                    result = await response.json();
 
+                    var model_types = result; // get the JSON-Object
+                    var count = Object.keys(model_types).length;
+
+                    var modelTypeSelected = modelTypeSelect.value; // remember the current selected modelType.option value
+                    modelTypeSelect.options.length = 0; // clear all current modelTypeSelect options
+
+                    if (count === 0) {
+                        // Add a default option if no model types are available
+                        const defaultOption = document.createElement('option');
+                        defaultOption.text = 'Please create shared folders first';
+                        defaultOption.value = '';
+                        modelTypeSelect.add(defaultOption);
+                        return;
+                    }
+
+                    for (i = 0; i < count; i++) {
+                        modelTypeOption = document.createElement('option');
+                        modelType = model_types[String(i)]['modelfolder'];
+                        modelTypeOption.setAttribute('value', modelType);
+                        modelTypeOption.appendChild(document.createTextNode(model_types[String(i)]['desc']));
+                        modelTypeSelect.appendChild(modelTypeOption);
+                    }
+
+                    if (modelTypeSelected === "") {
+                        modelTypeSelect.selectedIndex = 0;
+                        MODELTYPE_SELECTED = modelTypeSelect.options[0].value;
+                    } else {
+                        modelTypeSelect.value = modelTypeSelected;
+                        MODELTYPE_SELECTED = modelTypeSelected;
+                    }
+                } catch (error) {
+                    console.error('Error refreshing model types:', error);
+                }
                 break;
 
             case "selectModelType":
@@ -3074,7 +3134,7 @@
                 progressBar.style.width = '100%';
                 progressBar.textContent = '100%';
                 await loadModelFolders();
-                showRecreateSymlinksButton();
+                // Remove showRecreateSymlinksButton call since it's automatic now
             } else if (result.status === 'choice_required') {
                 if (result.data.type === 'file') {
                     showFileChoiceDialog(result.data, url, modelName, modelType, civitaiToken, hfToken);
@@ -3172,31 +3232,6 @@
             }
         } catch (error) {
             console.error('Error loading model folders:', error);
-        }
-    }
-
-    function showRecreateSymlinksButton() {
-        const buttonContainer = document.getElementById('recreate-symlinks-container');
-        buttonContainer.innerHTML = `
-            <button onclick="recreateSymlinks()" class="settings-button">Recreate Symlinks</button>
-            <p id="symlink-status"></p>
-        `;
-        buttonContainer.style.display = 'block';
-    }
-
-    async function recreateSymlinks() {
-        const statusElement = document.getElementById('symlink-status');
-        statusElement.textContent = 'Recreating symlinks...';
-        try {
-            const response = await fetch('/recreate_symlinks', { method: 'POST' });
-            const data = await response.json();
-            if (data.status === 'success') {
-                statusElement.textContent = data.message;
-            } else {
-                statusElement.textContent = 'Error: ' + data.message;
-            }
-        } catch (error) {
-            statusElement.textContent = 'Error: ' + error.message;
         }
     }
 
@@ -3315,12 +3350,10 @@
 
     // Call this function when the Models tab is opened
     document.querySelector('.navbar-tabs a[onclick="openTab(event, \'models-tab\')"]').addEventListener('click', function() {
-        //alert("querySelector");
-        loadModelFolders(); // lutzapps - this ModelFolders is NOT for the 'modelType' "select dropdown" model list
-        extendUIHelper(); // lutzapps - select the last know MODELTYPE_SELECTED in the WebUI Dom Id 'modelType' "select dropdown" model list
+        loadModelFolders();
+        refreshModelTypes();  // Refresh model types when switching to Models tab
         loadCivitaiToken();
-        loadHFToken(); // lutzapps - added HF_TOKEN ENV var Support
-
+        loadHFToken();
         updateExampleUrls();
     });
 
@@ -3467,27 +3500,26 @@
             }
         }
 
-        async function updateFileBrowserStatus() {
-            try {
-                const response = await fetch('/filebrowser_status');
-                const result = await response.json();
-                const statusElement = document.getElementById('filebrowser-status');
-                if (statusElement) {
-                    statusElement.textContent = result.status;
-                }
-                const startButton = document.getElementById('start-filebrowser');
-                const stopButton = document.getElementById('stop-filebrowser');
-                if (startButton && stopButton) {
-                    startButton.disabled = (result.status === 'running');
-                    stopButton.disabled = (result.status === 'stopped');
-                }
-            } catch (error) {
-                console.error('Error updating File Browser status:', error);
-            }
+        function updateFileBrowserStatus() {
+            fetch('/filebrowser_status')
+                .then(response => response.json())
+                .then(data => {
+                    const statusElement = document.getElementById('filebrowser-status');
+                    if (statusElement) {
+                        statusElement.textContent = data.status;
+                    }
+                    const startButton = document.getElementById('start-filebrowser');
+                    const stopButton = document.getElementById('stop-filebrowser');
+                    if (startButton && stopButton) {
+                        startButton.disabled = (data.status === 'running');
+                        stopButton.disabled = (data.status === 'stopped');
+                    }
+                })
+                .catch(error => console.error('Error updating File Browser status:', error));
         }
 
-        // Call this function periodically to update the status
-        setInterval(updateFileBrowserStatus, 5000);
+        // Reduce the frequency of status updates
+        setInterval(updateFileBrowserStatus, 30000); // Check every 30 seconds instead of 5 seconds
 
         // Update the DOMContentLoaded event listener
         document.addEventListener('DOMContentLoaded', function() {
@@ -3542,7 +3574,8 @@
             console.log("WebSocket message received:", data);
 
             if (data.type === 'heartbeat') {
-                sendWebSocketMessage('heartbeat', {});
+                // Reset heartbeat timeout on receiving heartbeat response
+                resetHeartbeatTimeout();
             } else if (data.type === 'install_progress') {
                 updateInstallProgress(data.data);
             } else if (data.type === 'install_log') {

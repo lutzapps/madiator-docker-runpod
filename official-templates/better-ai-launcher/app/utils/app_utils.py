@@ -699,39 +699,12 @@ def download_and_unpack_venv_v2(app_name:str, app_configs:dict, send_websocket_m
             return False, error_message
         
         send_websocket_message('install_progress', {'app_name': app_name, 'percentage': 100, 'stage': 'Unpacking Complete'})
+        send_websocket_message('install_log', {'app_name': app_name, 'log': 'Unpacking complete. Proceeding to clone repository...'})
 
-        ### installing the App from GITHUB
-        # Clone the repository if it doesn't exist
-        success, message = clone_application(app_name)
-
-        print(f"'DEBUG_SETTINGS' after this run:\n{pretty_dict(DEBUG_SETTINGS)}")
-        
-        ### original "v1" code (very slow code because of STATISTICS glory
-
-        # unpack_command = f"tar -xzvf {downloaded_file} -C {venv_path}"
-        # process = subprocess.Popen(unpack_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
-        
-        # total_files = sum(1 for _ in subprocess.Popen(f"tar -tvf {downloaded_file}", shell=True, stdout=subprocess.PIPE).stdout)
-        # files_processed = 0
-        
-        # for line in process.stdout:
-        #     files_processed += 1
-        #     percentage = min(int((files_processed / total_files) * 100), 100)
-        #     send_websocket_message('install_progress', {
-        #         'app_name': app_name,
-        #         'percentage': percentage,
-        #         'stage': 'Unpacking',
-        #         'processed': files_processed,
-        #         'total': total_files
-        #     })
-        #     send_websocket_message('install_log', {'app_name': app_name, 'log': f"Unpacking: {line.strip()}"})
-        
-        # process.wait()
-        # rc = process.returncode
-
-        ### installing the App from GITHUB
-        # Clone the repository if it doesn't exist
-        success, error_message = clone_application(app_name, send_websocket_message)
+        # Clone the repository
+        success, message = clone_application(app_config, send_websocket_message)
+        if not success:
+            return False, message
 
         # Clean up the downloaded file
         send_websocket_message('install_log', {'app_name': app_name, 'log': 'Cleaning up...'})
@@ -742,19 +715,10 @@ def download_and_unpack_venv_v2(app_name:str, app_configs:dict, send_websocket_m
             os.remove(downloaded_file)
 
         send_websocket_message('install_log', {'app_name': app_name, 'log': 'Installation complete. Refresh page to start app'})
+        save_install_status(app_name, 'completed', 100, 'Completed')
+        send_websocket_message('install_complete', {'app_name': app_name, 'status': 'success', 'message': "Virtual environment installed successfully."})
+        return True, "Virtual environment installed successfully."
 
-        if success:
-            save_install_status(app_name, 'completed', 100, 'Completed')
-            send_websocket_message('install_complete', {'app_name': app_name, 'status': 'success', 'message': "Virtual environment installed successfully."})
-            return True, "Virtual environment installed successfully."
-        else:
-            return False, error_message
-    
-    except requests.RequestException as e:
-        error_message = f"Download/Decompression failed: {str(e)}"
-        send_websocket_message('install_complete', {'app_name': app_name, 'status': 'error', 'message': error_message})
-        save_install_status(app_name, 'failed', 0, 'Failed')
-        return False, error_message
     except Exception as e:
         error_message = f"Installation failed: {str(e)}\n{traceback.format_exc()}"
         save_install_status(app_name, 'failed', 0, 'Failed')
