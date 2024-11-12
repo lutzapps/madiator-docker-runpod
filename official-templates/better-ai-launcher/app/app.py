@@ -17,8 +17,10 @@ from utils.filebrowser_utils import configure_filebrowser, start_filebrowser, st
 from utils.app_utils import (
     run_app, update_process_status, check_app_directories, get_app_status,
     force_kill_process_by_name, update_webui_user_sh, save_install_status,
-    get_install_status, download_and_unpack_venv, fix_custom_nodes, is_process_running, install_app #, update_model_symlinks
+    get_install_status, download_and_unpack_venv, fix_custom_nodes, is_process_running, install_app, # update_model_symlinks
+    get_bkohya_launch_url # lutzapps - support dynamic generated gradio url
 )
+
 # lutzapps - CHANGE #1
 LOCAL_DEBUG = os.environ.get('LOCAL_DEBUG', 'False') # support local browsing for development/debugging
 
@@ -67,7 +69,7 @@ running_processes = {}
 
 app_configs = get_app_configs()
 
-S3_BASE_URL = "https://better.s3.madiator.com/"
+#S3_BASE_URL = "https://better.s3.madiator.com/" # unused now
 
 SETTINGS_FILE = '/workspace/.app_settings.json'
 
@@ -186,6 +188,19 @@ def get_logs(app_name):
     if app_name in running_processes:
         return jsonify({'logs': running_processes[app_name]['log'][-100:]})
     return jsonify({'logs': []})
+
+# lutzapps - support bkohya gradio url
+@app.route('/get_bkohya_launch_url', methods=['GET'])
+def get_bkohya_launch_url_route():
+    command =  app_configs['bkohya']['command']
+    is_gradio = ("--share" in command.lower()) # gradio share mode
+    if is_gradio:
+        mode = 'gradio'
+    else:
+        mode = 'local'
+
+    launch_url = get_bkohya_launch_url() # get this from the app_utils global BKOHYA_GRADIO_URL, which is polled from the kohya log
+    return jsonify({ 'mode': mode, 'url': launch_url }) # used from the index.html:OpenApp() button click function
 
 @app.route('/kill_all', methods=['POST'])
 def kill_all():

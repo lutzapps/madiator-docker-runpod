@@ -1,6 +1,7 @@
 import os
 import xml.etree.ElementTree as ET
 import requests
+import urllib.request
 import json
 
 # this is the replacement for the XML manifest, and defines all app_configs in full detail
@@ -141,7 +142,13 @@ app_configs = {
     'bkohya': {
         'id': 'bkohya', # app_name
         'name': 'Better Kohya',
-        'command': 'cd /workspace/bkohya && . ./bin/activate && cd /workspace/kohya_ss && python ./kohya_gui.py --headless --share --server_port 7860', # TODO!! check ./kohya_gui.py
+        'command': 'cd /workspace/bkohya && . ./bin/activate && cd /workspace/kohya_ss && python ./kohya_gui.py --headless --share --server_port 7864', # TODO!! check other ""./kohya_gui.py" cmdlines options
+        # need to check: 
+        # python ./kohya_gui.py --inbrowser --server_port 7864
+        # works for now:
+        # python ./kohya_gui.py --headless --share --server_port 7864
+        # creates a gradio link for 72h like e.g. https://b6365c256c395e755b.gradio.live
+        #
         ### for Gradio supported reverse proxy:
         # --share               -> Share the gradio UI
         # --root_path ROOT_PATH -> root_path` for Gradio to enable reverse proxy support. e.g. /kohya_ss
@@ -182,8 +189,8 @@ app_configs = {
 
         'venv_path': '/workspace/bkohya',
         'app_path': '/workspace/kohya_ss',
-        'port': 7860,
-        'download_url': 'https://better.s3.madiator.com/kohya.tar.gz', # (2024-11-08 13:13:00Z) - lutzapps
+        'port': 7864,
+        'download_url': 'https://better.s3.madiator.com/bkohya/kohya.tar.gz', # (2024-11-08 13:13:00Z) - lutzapps
         'venv_uncompressed_size': 12128345264, # uncompressed size of the tar-file (in bytes)
         'archive_size': 6314758227, # tar filesize (in bytes)
         'sha256_hash': '9a0c0ed5925109e82973d55e28f4914fff6728cfb7f7f028a62e2ec1a9e4f60a',
@@ -276,12 +283,12 @@ def write_dict_to_jsonfile(dict:dict, json_filepath:str, overwrite:bool=False) -
 
             return False, error_msg # failure
         
-        # Write the JSON data to a file
+        # Write the JSON data to a file BUGBUG
         with open(json_filepath, 'w', encoding='utf-8') as output_file:
             json.dump(dict, output_file, ensure_ascii=False, indent=4, separators=(',', ': '))
 
     except Exception as e:
-        error_msg = f"ERROR in shared_models:write_dict_to_jsonfile() - loading JSON Map File '{json_filepath}'\nException: {str(e)}"
+        error_msg = f"ERROR in write_dict_to_jsonfile() - loading JSON Map File '{json_filepath}'\nException: {str(e)}"
         print(error_msg)
 
         return False, error_msg # failure
@@ -293,17 +300,20 @@ def read_dict_from_jsonfile(json_filepath:str) -> tuple [dict, str]:
     # Read JSON file from 'json_filepath' and return it as 'dict'
 
     try:
-        if os.path.exists(json_filepath):
+        if ":" in json_filepath: # filepath is online Url containing ":" like http:/https:/ftp:
+            with urllib.request.urlopen(json_filepath) as url:
+                dict = json.load(url)
+        elif os.path.exists(json_filepath): # local file path, e.g. "/workspace/...""
             with open(json_filepath, 'r') as input_file:
                 dict = json.load(input_file)
         else:
-            error_msg = f"dictionary file '{json_filepath}' does not exist"
-            #print(error_msg)
+            error_msg = f"local dictionary file '{json_filepath}' does not exist"
+            print(error_msg)
 
             return {}, error_msg # failure
 
     except Exception as e:
-        error_msg = f"ERROR in shared_models:read_dict_from_jsonfile() - loading JSON Map File '{json_filepath}'\nException: {str(e)}"
+        error_msg = f"ERROR in read_dict_from_jsonfile() - loading JSON Map File '{json_filepath}'\nException: {str(e)}"
         print(error_msg)
 
         return {}, error_msg # failure
@@ -317,30 +327,39 @@ def pretty_dict(dict:dict) -> str:
    return dict_string
 
 # helper function for "init_app_install_dirs(), "init_shared_model_app_map()", "init_shared_models_folders()" and "inir_DEBUG_SETTINGS()"
-def load_global_dict_from_file(dict:dict, dict_filepath:str, dict_description:str, SHARED_MODELS_DIR:str="", write_file:bool=True) -> tuple[bool, dict]:
+def load_global_dict_from_file(default_dict:dict, dict_filepath:str, dict_description:str, SHARED_MODELS_DIR:str="", write_file:bool=True) -> tuple[bool, dict]:
     # returns the 'dict' for 'dict_description' from 'dict_filepath'
+
+    success = False
+    return_dict = {}
 
     try:
         if not SHARED_MODELS_DIR == "" and not os.path.exists(SHARED_MODELS_DIR):
             print(f"\nThe SHARED_MODELS_DIR '{SHARED_MODELS_DIR}' is not found!\nCreate it by clicking the 'Create Shared Folders' button from the WebUI 'Settings' Tab\n")
             
-            return
+            return False, return_dict
         
-        if os.path.isfile(dict_filepath) and os.path.exists(dict_filepath):
+        # read from file, if filepath is online url (http:/https:/ftp:) or local filepath exists
+        if ":" in dict_filepath or \
+            os.path.isfile(dict_filepath) and os.path.exists(dict_filepath):
             dict_filepath_found = True
             # read the dict_description from JSON file
-            print(f"\nExisting '{dict_description}' found and read from file '{dict_filepath}'\nThe file overwrites the code defaults!")
+            print(f"\nExisting '{dict_description}' found online and read from file '{dict_filepath}'\nThe file overwrites the code defaults!")
 
-            dict, error_msg = read_dict_from_jsonfile(dict_filepath)
-            if not error_msg == "":
-                print(error_msg)
+            return_dict, error_msg = read_dict_from_jsonfile(dict_filepath)
+
+            success = (not return_dict == {} and error_msg == "") # translate to success state
+
+            if not success: # return_dict == {}
+                dict_filepath_found = False # handle 404 errors from online urls
+                return_dict = default_dict # use the code-defaults dict passed in
 
         else: # init the dict_description from app code
             dict_filepath_found = False
             print(f"No {dict_description}_FILE found, initializing default '{dict_description}' from code ...")
             # use already defined dict from app code
             # write the dict to JSON file
-            success, ErrorMsg = write_dict_to_jsonfile(dict, dict_filepath)
+            success, ErrorMsg = write_dict_to_jsonfile(default_dict, dict_filepath)
 
             if success:
                 print(f"'{dict_description}' is initialized and written to file '{dict_filepath}'")
@@ -348,14 +367,15 @@ def load_global_dict_from_file(dict:dict, dict_filepath:str, dict_description:st
                 print(ErrorMsg)
         
         # Convert 'dict_description' dictionary to formatted JSON
-        print(f"\nUsing {'external' if dict_filepath_found else 'default'} '{dict_description}':\n{pretty_dict(dict)}")
+        print(f"\nUsing {'external' if dict_filepath_found else 'default'} '{dict_description}':\n{pretty_dict(return_dict)}")
 
     except Exception as e:
-        print(f"ERROR in shared_models:load_global_dict_from_file() - initializing dict Map File '{dict_filepath}'\nException: {str(e)}")
+        print(f"ERROR in load_global_dict_from_file() - initializing dict file '{dict_filepath}'\nException: {str(e)}")
 
         return False, {}
     
-    return True, dict # success
+    return success, return_dict
+
 
 DEBUG_SETTINGS_FILE = "/workspace/_debug_settings.json"
 DEBUG_SETTINGS = {
@@ -380,9 +400,9 @@ def init_debug_settings():
 
     local_debug = os.environ.get('LOCAL_DEBUG', 'False') # support local browsing for development/debugging
     generate_debug_settings_file = os.environ.get('DEBUG_SETTINGS_FILE', 'False') # generate the DEBUG_SETTINGS_FILE, if not exist already
-    write_file_if_not_exist = local_debug == 'True' or generate_debug_settings_file == 'True'
+    write_file_if_not_exists = (local_debug == 'True' or local_debug == 'true' or generate_debug_settings_file == 'True' or generate_debug_settings_file == 'true')
 
-    success, dict = load_global_dict_from_file(DEBUG_SETTINGS, DEBUG_SETTINGS_FILE, "DEBUG_SETTINGS", write_file=write_file_if_not_exist)
+    success, dict = load_global_dict_from_file(DEBUG_SETTINGS, DEBUG_SETTINGS_FILE, "DEBUG_SETTINGS", write_file=write_file_if_not_exists)
     if success:
         DEBUG_SETTINGS = dict
 
@@ -426,21 +446,28 @@ APP_CONFIGS_FILE = APP_CONFIGS_MANIFEST_URL # default is the online manifest url
 # when the IMAGE is used normally.
 
 def init_app_configs():
+    global APP_CONFIGS_MANIFEST_URL
     global APP_CONFIGS_FILE
     global app_configs
 
     # check for overwrite of APP_CONFIGS_MANIFEST_URL
-    if not DEBUG_SETTINGS['APP_CONFIGS_MANIFEST_URL'] == "":
-        APP_CONFIGS_FILE = DEBUG_SETTINGS['APP_CONFIGS_MANIFEST_URL']
+    debug_app_configs_manifest_url = DEBUG_SETTINGS['APP_CONFIGS_MANIFEST_URL']
+    if not debug_app_configs_manifest_url == "":
+        print(f"using APP_CONFIGS_MANIFEST_URL from DEBUG_SETTINGS: {debug_app_configs_manifest_url}")
+        APP_CONFIGS_MANIFEST_URL = debug_app_configs_manifest_url
+        APP_CONFIGS_FILE = APP_CONFIGS_MANIFEST_URL
+
+
+    print(f"\nUsing APP_CONFIGS_MANIFEST_URL={APP_CONFIGS_MANIFEST_URL}")
 
     local_debug = os.environ.get('LOCAL_DEBUG', 'False') # support local browsing for development/debugging
     generate_app_configs_file = os.environ.get('APP_CONFIGS_FILE', 'False') # generate the APP_CONFIGS_FILE, if not exist already
-    write_file_if_not_exists = local_debug == 'True' or generate_app_configs_file == 'True'
+    write_file_if_not_exists = (local_debug == 'True' or local_debug == 'true' or generate_app_configs_file == 'True' or generate_app_configs_file == 'true')
 
     success, dict = load_global_dict_from_file(app_configs, APP_CONFIGS_FILE, "APP_CONFIGS", write_file=write_file_if_not_exists)
  
     if success:
-        app_configs = dict # overwrite code-defaults (from local or external settings)
+        app_configs = dict # overwrite code-defaults (from local or external/online JSON settings file)
     #else app_configs = <code defaults already initialized>
 
     return
