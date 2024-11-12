@@ -45,15 +45,15 @@
             font-size: 1.4em;
         }
         .button-group {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
+            display: flex;
+            flex-direction: row;
+            gap: 8px;
             margin-bottom: 10px;
         }
         button {
             border: none;
             color: white;
-            padding: 12px 15px;
+            padding: 8px 15px;
             text-align: center;
             text-decoration: none;
             display: inline-flex;
@@ -63,51 +63,36 @@
             cursor: pointer;
             border-radius: 5px;
             transition: background-color 0.3s, transform 0.1s;
-            width: 100%;
-        }
-        button:hover:not(:disabled) {
-            transform: translateY(-2px);
         }
         button:disabled {
-            background-color: #cccccc;
+            opacity: 0.6;
             cursor: not-allowed;
         }
         button i {
-            margin-right: 5px;
+            margin-right: 8px;
         }
-        .start-button {
-            background-color: #4CAF50;
-        }
-        .start-button:hover:not(:disabled) {
-            background-color: #45a049;
-        }
-        .stop-button {
-            background-color: #f44336;
-        }
-        .stop-button:hover:not(:disabled) {
-            background-color: #da190b;
-        }
-        .log-button {
-            background-color: #008CBA;
-        }
-        .log-button:hover:not(:disabled) {
-            background-color: #007aa3;
-        }
-        .open-button {
-            background-color: #FF9800;
-        }
-        .open-button:hover:not(:disabled) {
-            background-color: #e68a00;
-        }
+        .start-button { background-color: #4CAF50; }
+        .stop-button { background-color: #f44336; }
+        .log-button { background-color: #008CBA; }
+        .open-button { background-color: #FF9800; }
+        .force-kill-button { background-color: #d9534f; }
+        
         .install-button {
+            width: 100%;
+            margin-top: 10px;
             background-color: #9C27B0;
-            grid-column: span 2;
         }
         .install-button:hover {
             background-color: #7B1FA2;
         }
-        .force-kill-button {
-            background-color: #d9534f;
+        .log-button:hover:not(:disabled) {
+            background-color: #007aa3;
+        }
+        .open-button:hover:not(:disabled) {
+            background-color: #e68a00;
+        }
+        .install-button:hover {
+            background-color: #7B1FA2;
         }
         .force-kill-button:hover:not(:disabled) {
             background-color: #c9302c;
@@ -456,7 +441,8 @@
         }
 
         .fix-custom-nodes-button {
-            background-color: #9C27B0;
+            width: 100%;  /* Keep fix custom nodes button full width */
+            margin-top: 10px;
         }
 
         .fix-custom-nodes-button:hover {
@@ -1059,13 +1045,6 @@
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
-        }
-
-        #logs-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            position: relative;
         }
 
 
@@ -1963,10 +1942,8 @@
                 overflow-y: auto;
             }
             
-            .model-downloader-section,
-            .right-column {
-                height: auto;
-                max-height: calc(50vh - 100px);
+            .model-folders-container {
+                max-height: 600px;
             }
         }
 
@@ -2336,6 +2313,63 @@
             width: 100%;
             box-sizing: border-box;
         }
+
+        /* Example URLs styling */
+        .example-urls {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #333;
+            border-radius: 10px;
+        }
+
+        .example-url {
+            background-color: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .example-url:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .example-label {
+            display: block;
+            font-weight: bold;
+            color: #4CAF50;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+
+        .example-link {
+            display: block;
+            color: #fff;
+            text-decoration: none;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 0.9em;
+            padding: 8px;
+            background-color: #1a1a1a;
+            border-radius: 4px;
+            border: 1px solid #444;
+        }
+
+        .example-link:hover {
+            background-color: #2c2c2c;
+            border-color: #4CAF50;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1200px) {
+            .example-urls {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -2369,62 +2403,34 @@
                             {% for app_key, app_info in apps.items() %}
                             <div class="app">
                                 <h2>{{ app_info.name }}</h2>
-                                {% if app_status[app_key]['dirs_ok'] %}
-                                    <div class="button-group">
-                                        <button onclick="startApp('{{ app_key }}')" id="start-{{ app_key }}" class="start-button" {% if app_status[app_key]['status'] == 'running' %}disabled{% endif %}>
-                                            <i class="fas fa-play"></i> Start
-                                        </button>
-                                        <button onclick="stopApp('{{ app_key }}')" id="stop-{{ app_key }}" class="stop-button" {% if app_status[app_key]['status'] == 'stopped' %}disabled{% endif %}>
-                                            <i class="fas fa-stop"></i> Stop
-                                        </button>
-                                        <button onclick="viewLogs('{{ app_key }}', '{{ app_info.name }}')" class="log-button">
-                                            <i class="fas fa-list-alt"></i> View Logs
-                                        </button>
-                                        <button onclick="openApp('{{ app_key }}', {{ app_status[app_key]['port'] }})" id="open-{{ app_key }}" class="open-button" {% if app_status[app_key]['status'] == 'stopped' %}disabled{% endif %}>
-                                            <i class="fas fa-external-link-alt"></i> Open App
-                                        </button>
-                                        <button onclick="forceKillApp('{{ app_key }}')" id="force-kill-{{ app_key }}" class="force-kill-button">
-                                            <i class="fas fa-skull-crossbones"></i> Force Kill
-                                        </button>
-                                        {% if app_status[app_key]['dirs_ok'] and app_status[app_key]['is_bcomfy'] %}
-                                            <button onclick="fixCustomNodes('{{ app_key }}')" id="fix-custom-nodes-{{ app_key }}" class="fix-custom-nodes-button">
-                                                <i class="fas fa-wrench"></i> Fix Custom Nodes
-                                            </button>
-                                        {% endif %}
-                                    </div>
-                                    <span id="status-{{ app_key }}" class="status status-{{ app_status[app_key]['status'] }}">
-                                        {{ app_status[app_key]['status'] | capitalize }}
-                                    </span>
-                                {% else %}
-                                    <p class="error-message">{{ app_status[app_key]['message'] }}</p>
-                                    {% if not app_status[app_key]['installed'] %}
-                                        <div class="install-container">
-                                            <button onclick="installApp('{{ app_key }}')" id="install-{{ app_key }}" class="install-button" {% if app_status[app_key]['install_status']['status'] == 'in_progress' %}disabled{% endif %}>
-                                                <i class="fas fa-download"></i> {% if app_status[app_key]['install_status']['status'] == 'in_progress' %}Installing...{% else %}Install {{ app_info.name }}{% endif %}
-                                            </button>
-                                            <div id="install-progress-{{ app_key }}" class="install-progress" {% if app_status[app_key]['install_status']['status'] == 'in_progress' %}style="display: block;"{% endif %}>
-                                                <div class="progress-container">
-                                                    <div class="progress-label">Download Progress:</div>
-                                                    <div class="progress-bar">
-                                                        <div class="progress-bar-fill download-progress" style="width: 0%">0%</div>
-                                                    </div>
-                                                </div>
-                                                <div class="progress-container">
-                                                    <div class="progress-label">Unpack Progress:</div>
-                                                    <div class="progress-bar">
-                                                        <div class="progress-bar-fill unpack-progress" style="width: 0%">0%</div>
-                                                    </div>
-                                                </div>
-                                                <div class="download-info">
-                                                    <span class="download-speed"></span>
-                                                    <span class="download-eta"></span>
-                                                </div><!-- 4 lutzapps - remove a typo "4" -->
-                                                <div class="install-stage"></div>
-                                            </div>
-                                        </div>
-                                        <div id="install-logs-{{ app_key }}" class="install-logs"></div>
-                                    {% endif %}
+                                <div class="button-group">
+                                    <button onclick="startApp('{{ app_key }}')" id="start-{{ app_key }}" class="start-button" {% if app_status[app_key]['status'] == 'running' %}disabled{% endif %}>
+                                        <i class="fas fa-play"></i> Start
+                                    </button>
+                                    <button onclick="stopApp('{{ app_key }}')" id="stop-{{ app_key }}" class="stop-button" {% if app_status[app_key]['status'] == 'stopped' %}disabled{% endif %}>
+                                        <i class="fas fa-stop"></i> Stop
+                                    </button>
+                                    <button onclick="viewLogs('{{ app_key }}', '{{ app_info.name }}')" class="log-button">
+                                        <i class="fas fa-list-alt"></i> View Logs
+                                    </button>
+                                    <button onclick="openApp('{{ app_key }}', {{ app_status[app_key]['port'] }})" id="open-{{ app_key }}" class="open-button" {% if app_status[app_key]['status'] == 'stopped' %}disabled{% endif %}>
+                                        <i class="fas fa-external-link-alt"></i> Open App
+                                    </button>
+                                    <button onclick="forceKillApp('{{ app_key }}')" id="force-kill-{{ app_key }}" class="force-kill-button">
+                                        <i class="fas fa-times-circle"></i> Force Kill
+                                    </button>
+                                </div>
+                                {% if app_key == 'bcomfy' and app_status[app_key]['installed'] %}
+                                <button onclick="fixCustomNodes('{{ app_key }}')" id="fix-custom-nodes-{{ app_key }}" class="fix-custom-nodes-button">
+                                    <i class="fas fa-wrench"></i> Fix Custom Nodes
+                                </button>
                                 {% endif %}
+                                {% if not app_status[app_key]['installed'] %}
+                                <button onclick="installApp('{{ app_key }}')" id="install-{{ app_key }}" class="install-button">
+                                    <i class="fas fa-download"></i> Install
+                                </button>
+                                {% endif %}
+                                <div class="status">Status: {{ app_status[app_key]['status'] }}</div>
                             </div>
                             {% endfor %}
                         </div>
@@ -2537,27 +2543,27 @@
                         <div id="example-urls" class="inner-tab-content active">
                             <div class="example-urls">
                                 <div class="example-url">
-                                    <span class="example-label">Stable Diffusion:</span>
+                                    <span class="example-label">Stable Diffusion Model:</span>
                                     <a href="#" class="example-link" id="example-sd" onclick="useInModelDownloader('ckpt', this.textContent); return false;"></a>
                                 </div>
                                 <div class="example-url">
-                                    <span class="example-label">LoRA:</span>
+                                    <span class="example-label">LoRA Model:</span>
                                     <a href="#" class="example-link" id="example-lora" onclick="useInModelDownloader('loras', this.textContent); return false;"></a>
                                 </div>
                                 <div class="example-url">
-                                    <span class="example-label">VAE:</span>
+                                    <span class="example-label">VAE Model:</span>
                                     <a href="#" class="example-link" id="example-vae" onclick="useInModelDownloader('vae', this.textContent); return false;"></a>
                                 </div>
                                 <div class="example-url">
-                                    <span class="example-label">Upscaler:</span>
+                                    <span class="example-label">Upscaler Model:</span>
                                     <a href="#" class="example-link" id="example-upscaler" onclick="useInModelDownloader('upscale_models', this.textContent); return false;"></a>
                                 </div>
                                 <div class="example-url">
-                                    <span class="example-label">Flux Dev:</span>
+                                    <span class="example-label">Flux Dev Model:</span>
                                     <a href="#" class="example-link" id="example-flux-dev" onclick="useInModelDownloader('unet', this.textContent); return false;"></a>
                                 </div>
                                 <div class="example-url">
-                                    <span class="example-label">Flux Schnell:</span>
+                                    <span class="example-label">Flux Schnell Model:</span>
                                     <a href="#" class="example-link" id="example-flux-schnell" onclick="useInModelDownloader('unet', this.textContent); return false;"></a>
                                 </div>
                             </div>
@@ -2589,568 +2595,646 @@
         </audio>
     </div>
 
+    <!-- Add this near the top of the body, before other scripts -->
     <script>
-    const appStatuses = {};
-    let currentLogApp = null;
-    let currentLogAppName = null;
-    const podId = '{{ pod_id }}';
-    const WS_PORT = 7222;  // This is the Nginx port
-
-    // lutzapps - remember the last know MODELTYPE_SELECTED of the WebUI Dom Id 'modelType' "select dropdown" model list
-    // so the selection can be restored between "Tab Switches", and during refreshes/reloads of the modelType list
-    // this is handled by the extendUIHelper() function, which is called directly from JavaScript events,
-    // but is also called indirectly from Python code via WS message type='extend_ui_helper'
-    // e.g. from the model_utils:download_civitai_model() function, to preserve "state" of the selected modelType
-
-    let MODELTYPE_SELECTED = "";
-    modelType.onchange = function() {
-        MODELTYPE_SELECTED = this.value;
-        alert("onchange=" + MODELTYPE_SELECTED);
-    }
-
-    // *** lutzapps - Change #2 - support to run locally at http://localhost:${WS_PORT} (3 locations in "index.html")
-    const enable_unsecure_localhost = '{{ enable_unsecure_localhost }}';
-
-    // default is to use the "production" WeckSockets CloudFlare URL
-    // NOTE: ` (back-ticks) are used here for template literals
-    var WS_URL = `wss://${podId}-${WS_PORT}.proxy.runpod.net/ws`; // need to be declared as var
-
-    if (`${enable_unsecure_localhost}` === 'True') { // value of LOCAL_DEBUG ENV var
-        // make sure to use "ws" Protocol (insecure) instead of "wss" (WebSockets Secure) for localhost,
-        // otherwise you will get the 'loadingOverlay' stay and stays on screen with ERROR:
-        // "WebSocket disconnected. Attempting to reconnect..." blocking the webpage http://localhost:7222
-        WS_URL = `ws://localhost:${WS_PORT}/ws`; // localhost WS (unsecured)
-        //alert(`Running locally with WS_URL=${WS_URL}`);
-    }
-
-
-    let socket;
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 5;
-    const reconnectInterval = 5000; // 5 seconds
-
-    function connectWebSocket() {
-        console.log("Attempting to connect to WebSocket...");
-        document.getElementById('loadingMessage').textContent = 'Connecting to WebSocket...';
-
-        socket = new WebSocket(WS_URL);
-
-        socket.onopen = function(e) {
-            console.log("Connected to WebSocket");
-            document.getElementById('loadingOverlay').style.display = 'none';
-            reconnectAttempts = 0;
-            initializeUI();
-            // Start sending heartbeats immediately after connection
-            startHeartbeat();
+        // Make app_configs available to JavaScript
+        const app_configs = {
+            {% for app_key, app_info in apps.items() %}
+                "{{ app_key }}": {
+                    "name": "{{ app_info.name }}",
+                    "port": {{ app_info.port }}
+                },
+            {% endfor %}
         };
+    </script>
 
-        socket.onmessage = function(event) {
-            try {
-                const data = JSON.parse(event.data);
-                console.log(`Data received from server:`, data);
-                
-                if (data.type === 'heartbeat') {
-                    // Reset heartbeat timeout on receiving heartbeat response
-                    resetHeartbeatTimeout();
-                } else if (data.type === 'model_download_progress') {
-                    updateModelDownloadProgress(data.data);
-                } else if (data.type === 'status_update') {
-                    updateAppStatus(data.data);
+    <!-- Rest of your JavaScript code -->
+    <script>
+        const appStatuses = {};
+        let currentLogApp = null;
+        let currentLogAppName = null;
+        const podId = '{{ pod_id }}';
+        const WS_PORT = 7222;  // This is the Nginx port
+
+        // lutzapps - remember the last know MODELTYPE_SELECTED of the WebUI Dom Id 'modelType' "select dropdown" model list
+        // so the selection can be restored between "Tab Switches", and during refreshes/reloads of the modelType list
+        // this is handled by the extendUIHelper() function, which is called directly from JavaScript events,
+        // but is also called indirectly from Python code via WS message type='extend_ui_helper'
+        // e.g. from the model_utils:download_civitai_model() function, to preserve "state" of the selected modelType
+
+        let MODELTYPE_SELECTED = "";
+        modelType.onchange = function() {
+            MODELTYPE_SELECTED = this.value;
+            alert("onchange=" + MODELTYPE_SELECTED);
+        }
+
+        // *** lutzapps - Change #2 - support to run locally at http://localhost:${WS_PORT} (3 locations in "index.html")
+        const enable_unsecure_localhost = '{{ enable_unsecure_localhost }}';
+
+        // default is to use the "production" WeckSockets CloudFlare URL
+        // NOTE: ` (back-ticks) are used here for template literals
+        var WS_URL = `wss://${podId}-${WS_PORT}.proxy.runpod.net/ws`; // need to be declared as var
+
+        if (`${enable_unsecure_localhost}` === 'True') { // value of LOCAL_DEBUG ENV var
+            // make sure to use "ws" Protocol (insecure) instead of "wss" (WebSockets Secure) for localhost,
+            // otherwise you will get the 'loadingOverlay' stay and stays on screen with ERROR:
+            // "WebSocket disconnected. Attempting to reconnect..." blocking the webpage http://localhost:7222
+            WS_URL = `ws://localhost:${WS_PORT}/ws`; // localhost WS (unsecured)
+            //alert(`Running locally with WS_URL=${WS_URL}`);
+        }
+
+
+        let socket;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        const reconnectInterval = 5000; // 5 seconds
+
+        function connectWebSocket() {
+            console.log("Attempting to connect to WebSocket...");
+            document.getElementById('loadingMessage').textContent = 'Connecting to WebSocket...';
+
+            socket = new WebSocket(WS_URL);
+
+            socket.onopen = function(e) {
+                console.log("Connected to WebSocket");
+                document.getElementById('loadingOverlay').style.display = 'none';
+                reconnectAttempts = 0;
+                initializeUI();
+                // Start sending heartbeats immediately after connection
+                startHeartbeat();
+            };
+
+            socket.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log(`Data received from server:`, data);
+                    
+                    if (data.type === 'heartbeat') {
+                        // Reset heartbeat timeout on receiving heartbeat response
+                        resetHeartbeatTimeout();
+                    } else if (data.type === 'model_download_progress') {
+                        updateModelDownloadProgress(data.data);
+                    } else if (data.type === 'status_update') {
+                        updateAppStatus(data.data);
+                    }
+                    // Handle other message types as needed
+                } catch (error) {
+                    console.error('Error parsing WebSocket message:', error, 'Raw message:', event.data);
                 }
-                // Handle other message types as needed
-            } catch (error) {
-                console.error('Error parsing WebSocket message:', error, 'Raw message:', event.data);
-            }
-        };
+            };
 
-        socket.onclose = function(event) {
-            if (event.wasClean) {
-                console.log(`Connection closed cleanly, code=${event.code} reason=${event.reason}`);
-            } else {
-                console.log('Connection died');
-            }
-            handleReconnect();
-        };
+            socket.onclose = function(event) {
+                if (event.wasClean) {
+                    console.log(`Connection closed cleanly, code=${event.code} reason=${event.reason}`);
+                } else {
+                    console.log('Connection died');
+                }
+                handleReconnect();
+            };
 
-        socket.onerror = function(error) {
-            console.log(`WebSocket Error: ${error.message}`);
-            handleReconnect();
-        };
-    }
-
-    let heartbeatInterval;
-    let heartbeatTimeout;
-
-    function startHeartbeat() {
-        // Clear any existing intervals
-        if (heartbeatInterval) {
-            clearInterval(heartbeatInterval);
+            socket.onerror = function(error) {
+                console.log(`WebSocket Error: ${error.message}`);
+                handleReconnect();
+            };
         }
-        
-        // Send heartbeat every 60 seconds
-        heartbeatInterval = setInterval(() => {
-            if (socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ type: 'heartbeat' }));
-                // Set timeout to reconnect if no response within 10 seconds
-                setHeartbeatTimeout();
-            }
-        }, 60000);
-    }
 
-    function setHeartbeatTimeout() {
-        if (heartbeatTimeout) {
-            clearTimeout(heartbeatTimeout);
+        let heartbeatInterval;
+        let heartbeatTimeout;
+
+        function startHeartbeat() {
+            // Clear any existing intervals
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+            }
+            
+            // Send heartbeat every 60 seconds
+            heartbeatInterval = setInterval(() => {
+                if (socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({ type: 'heartbeat' }));
+                    // Set timeout to reconnect if no response within 10 seconds
+                    setHeartbeatTimeout();
+                }
+            }, 60000);
         }
-        heartbeatTimeout = setTimeout(() => {
-            console.log("Heartbeat timeout - attempting reconnect...");
+
+        function setHeartbeatTimeout() {
+            if (heartbeatTimeout) {
+                clearTimeout(heartbeatTimeout);
+            }
+            heartbeatTimeout = setTimeout(() => {
+                console.log("Heartbeat timeout - attempting reconnect...");
+                if (socket) {
+                    socket.close();
+                }
+                handleReconnect();
+            }, 65000); // Increased timeout to 65 seconds
+        }
+
+        function resetHeartbeatTimeout() {
+            if (heartbeatTimeout) {
+                clearTimeout(heartbeatTimeout);
+            }
+        }
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+            }
+            if (heartbeatTimeout) {
+                clearTimeout(heartbeatTimeout);
+            }
             if (socket) {
                 socket.close();
             }
-            handleReconnect();
-        }, 65000); // Increased timeout to 65 seconds
-    }
+        });
 
-    function resetHeartbeatTimeout() {
-        if (heartbeatTimeout) {
-            clearTimeout(heartbeatTimeout);
-        }
-    }
-
-    // Clean up on page unload
-    window.addEventListener('beforeunload', () => {
-        if (heartbeatInterval) {
-            clearInterval(heartbeatInterval);
-        }
-        if (heartbeatTimeout) {
-            clearTimeout(heartbeatTimeout);
-        }
-        if (socket) {
-            socket.close();
-        }
-    });
-
-    function handleReconnect() {
-        if (reconnectAttempts < maxReconnectAttempts) {
-            reconnectAttempts++;
-            document.getElementById('loadingOverlay').style.display = 'flex';
-            document.getElementById('loadingMessage').textContent = 
-                `WebSocket disconnected. Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`;
-            
-            // Add exponential backoff
-            const backoffTime = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-            setTimeout(connectWebSocket, backoffTime);
-        } else {
-            document.getElementById('loadingMessage').textContent = 
-                'Failed to connect to WebSocket. Installation continues in background. Please refresh page to see status.';
-        }
-    }
-
-    function sendWebSocketMessage(type, data) {
-        if (socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ type, data }));
-        }
-    }
-
-    let lastUpdateTime = 0;
-    const updateInterval = 250; // Update every 250ms
-
-    function updateModelDownloadProgress(data) {
-        const currentTime = Date.now();
-        if (currentTime - lastUpdateTime < updateInterval) {
-            return; // Skip update if it's too soon
-        }
-        lastUpdateTime = currentTime;
-
-        const progressBar = document.querySelector('#model-download-progress .progress-bar-fill');
-        const statusDiv = document.getElementById('model-download-status');
-        const speedDiv = document.getElementById('model-download-speed');
-        const etaDiv = document.getElementById('model-download-eta');
-        
-        if (data.percentage !== undefined) {
-            progressBar.style.width = `${data.percentage}%`;
-            progressBar.textContent = `${data.percentage.toFixed(2)}%`;
-        }
-        
-        statusDiv.textContent = data.message || '';
-        
-        if (data.speed) {
-            speedDiv.textContent = `Speed: ${data.speed}`;
-        } else {
-            speedDiv.textContent = 'Speed: N/A';
-        }
-        
-        if (data.eta) {
-            etaDiv.textContent = `ETA: ${formatTime(data.eta)}`;
-        } else {
-            etaDiv.textContent = 'ETA: Calculating...';
-        }
-        
-        if (data.stage === 'Complete') {
-            // lutzapps - clear 'Speed: N/A' and 'ETA: Calculating...' Div textContent, when no eta/speed data, but 'Complete'
-            etaDiv.textContent = '';
-            speedDiv.textContent = '';
-            loadModelFolders(); // Refresh the Existing Models section when download is complete
-        }
-    }
-
-    function updateAppStatus(appKey, status) {
-        appStatuses[appKey] = status;
-        const statusElement = document.getElementById(`status-${appKey}`);
-        if (statusElement) {
-            statusElement.textContent = status.charAt(0).toUpperCase() + status.slice(1);
-            statusElement.className = `status status-${status}`;
-            document.getElementById(`start-${appKey}`).disabled = (status === 'running');
-            document.getElementById(`stop-${appKey}`).disabled = (status === 'stopped');
-            document.getElementById(`open-${appKey}`).disabled = (status === 'stopped');
-        }
-    }
-
-    async function startApp(appKey) {
-        const response = await fetch(`/start/${appKey}`);
-        const data = await response.json();
-        if (data.status === 'started') {
-            updateAppStatus(appKey, 'running');
-            viewLogs(appKey, appConfigs[appKey].name);
-        } else if (data.status === 'error') {
-            alert(data.message);
-        }
-    }
-
-    async function stopApp(appKey) {
-        const response = await fetch(`/stop/${appKey}`);
-        const data = await response.json();
-        if (data.status === 'stopped') {
-            updateAppStatus(appKey, 'stopped');
-        } else if (data.status === 'error') {
-            alert(data.message);
-        }
-        await updateStatus();
-    }
-
-    async function openApp(appKey, port) {
-        // *** lutzapps - support to run locally and new support for bkohya gradio url
-        // NOTE: ` (back-ticks) are used here for template literals
-        var url = `https://${podId}-${port}.proxy.runpod.net/`; // need to be declared as var
-        if (`${enable_unsecure_localhost}` === 'True') {
-            url = `http://localhost:${port}/`; // remove runpod.net proxy
-        }
-
-        // new: support gradio url for kohya_ss, e.g. https://b6365c256c395e755b.gradio.live
-        //if (`${appKey}` === 'bkohya' && `${app_status[appKey]['status']}` === 'running') { // get the latest data from the server
-        if (appKey == 'bkohya') { // get the latest data from the server
-            var response = await fetch('/get_bkohya_launch_url');
-            var result = await response.json();
-            
-            var launch_mode = result['mode']; // 'gradio' or 'local'
-            //alert('launch_mode=' + launch_mode);
-
-            var launch_url = result['url'];
-            //alert('launch_url=' + launch_url);
-
-            if (launch_url !== '') { // when a launch url is defined, the app is initialized and ready to be opened
-                if (launch_mode === 'gradio') { // if it is a gradio url
-                    url = launch_url; // then use it, instead of the above defined CF proxy url
-                    //alert('using gradio for bkohya: ' + launch_url);
-                }
-                // else use the CF proxy url defined above for localhost, instead of the localhost url from the log
-            }   
-            else { // empty launch_url, waiting for launch url from log
-                if (launch_mode === 'gradio') {
-                    alert('Waiting for Gradio URL to be generated ...');
-                }
-                else {
-                    alert('Waiting for lokal Launch URL to be generated ...');
-                }
-                return; // no lauch Url yet
+        function handleReconnect() {
+            if (reconnectAttempts < maxReconnectAttempts) {
+                reconnectAttempts++;
+                document.getElementById('loadingOverlay').style.display = 'flex';
+                document.getElementById('loadingMessage').textContent = 
+                    `WebSocket disconnected. Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`;
+                
+                // Add exponential backoff
+                const backoffTime = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+                setTimeout(connectWebSocket, backoffTime);
+            } else {
+                document.getElementById('loadingMessage').textContent = 
+                    'Failed to connect to WebSocket. Installation continues in background. Please refresh page to see status.';
             }
         }
 
-        //alert(`openApp URL=${url}`);
-
-        window.open(url, '_blank'); // open app window as popup window
-    }
-
-    async function updateStatus() {
-        const response = await fetch('/status');
-        const data = await response.json();
-        for (const [appKey, status] of Object.entries(data)) {
-            updateAppStatus(appKey, status);
+        function sendWebSocketMessage(type, data) {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type, data }));
+            }
         }
-    }
 
-    function viewLogs(appKey, appName) {
-        currentLogApp = appKey;
-        currentLogAppName = appName;
-        document.getElementById('currentAppName').textContent = `Logs: ${appName}`;
-        updateLogs();
-        document.getElementById('downloadLogsBtn').style.display = 'flex';
-    }
+        let lastUpdateTime = 0;
+        const updateInterval = 250; // Update every 250ms
 
-    function updateLogs() {
-        if (currentLogApp) {
-            fetch(`/logs/${currentLogApp}`)
-                .then(response => response.json())
-                .then(data => {
-                    const logsDiv = document.getElementById('logs');
-                    const wasScrolledToBottom = logsDiv.scrollHeight - logsDiv.clientHeight <= logsDiv.scrollTop + 1;
-                    logsDiv.textContent = data.logs.join('\n');
-                    if (wasScrolledToBottom) {
-                        logsDiv.scrollTop = logsDiv.scrollHeight;
-                    }
-                    document.getElementById('downloadLogsBtn').style.display = 'flex';
-                });
-        } else {
-            document.getElementById('downloadLogsBtn').style.display = 'none';
+        function updateModelDownloadProgress(data) {
+            const currentTime = Date.now();
+            if (currentTime - lastUpdateTime < updateInterval) {
+                return; // Skip update if it's too soon
+            }
+            lastUpdateTime = currentTime;
+
+            const progressBar = document.querySelector('#model-download-progress .progress-bar-fill');
+            const statusDiv = document.getElementById('model-download-status');
+            const speedDiv = document.getElementById('model-download-speed');
+            const etaDiv = document.getElementById('model-download-eta');
+            
+            if (data.percentage !== undefined) {
+                progressBar.style.width = `${data.percentage}%`;
+                progressBar.textContent = `${data.percentage.toFixed(2)}%`;
+            }
+            
+            statusDiv.textContent = data.message || '';
+            
+            if (data.speed) {
+                speedDiv.textContent = `Speed: ${data.speed}`;
+            } else {
+                speedDiv.textContent = 'Speed: N/A';
+            }
+            
+            if (data.eta) {
+                etaDiv.textContent = `ETA: ${formatTime(data.eta)}`;
+            } else {
+                etaDiv.textContent = 'ETA: Calculating...';
+            }
+            
+            if (data.stage === 'Complete') {
+                // lutzapps - clear 'Speed: N/A' and 'ETA: Calculating...' Div textContent, when no eta/speed data, but 'Complete'
+                etaDiv.textContent = '';
+                speedDiv.textContent = '';
+                loadModelFolders(); // Refresh the Existing Models section when download is complete
+            }
         }
-    }
 
-    async function forceKillApp(appKey) {
-        if (confirm(`Are you sure you want to force kill ${appKey}? This may cause data loss.`)) {
+        function updateAppStatus(appKey, status) {
+            appStatuses[appKey] = status;
+            const statusElement = document.getElementById(`status-${appKey}`);
+            if (statusElement) {
+                statusElement.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+                statusElement.className = `status status-${status}`;
+                document.getElementById(`start-${appKey}`).disabled = (status === 'running');
+                document.getElementById(`stop-${appKey}`).disabled = (status === 'stopped');
+                document.getElementById(`open-${appKey}`).disabled = (status === 'stopped');
+            }
+        }
+
+        async function startApp(appKey) {
             try {
-                const response = await fetch(`/force_kill/${appKey}`, { method: 'POST' });
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                const response = await fetch(`/start/${appKey}`);
                 const data = await response.json();
-                if (data.status === 'killed') {
-                    updateAppStatus(appKey, 'stopped');
-                    alert(data.message);
-                } else {
-                    alert(`Error: ${data.message}`);
+                if (data.status === 'started' || data.status === 'already_running') {
+                    updateAppStatus({ [appKey]: 'running' });
+                    // Get the app name from app_configs and show logs
+                    const appName = app_configs[appKey].name;
+                    // Switch to logs view
+                    currentLogApp = appKey;
+                    currentLogAppName = appName;
+                    document.getElementById('currentAppName').textContent = `Logs - ${appName}`;
+                    document.getElementById('downloadLogsBtn').style.display = 'flex';
+                    document.getElementById('logs').textContent = ''; // Clear existing logs
+                    updateLogs(); // Start updating logs
+                    
+                    // Make sure logs section is visible
+                    const logsSection = document.querySelector('.logs-section');
+                    if (logsSection) {
+                        logsSection.style.display = 'flex';
+                    }
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert(`Error killing ${appKey}: ${error.message}`);
-            }
-            await updateStatus();
-        }
-    }
-
-    function initializeUI() {
-        updateStatus();
-        // TODO: need a way this 2 functions not pollute the logs every second or 5 seconds
-        setInterval(updateStatus, 5000);
-        setInterval(updateLogs, 1000);
-
-        // Initialize model types
-        refreshModelTypes();
-    }
-
-    async function refreshModelTypes() {
-        var data = {};
-        data.cmd = 'refreshModelTypes';
-        await extendUIHelper(data); // lutzapps - initialize the available SHARED_MODEL_FOLDERS for the "Model Downloader" modelType select list
-    }
-
-    // lutzapps - populate modeltype select options from shared_models
-    async function extendUIHelper(data) {
-        // check the data
-        // if no data is passed, the default cmd is "selectModelType" with no specific "model_type",
-        // which means to re-select the last selected modelType option from the global var MODELTYPE_SELECTED
-        var cmd = "selectModelType"; // default cmd, when called with empty data or empty cmd
-        var model_type = MODELTYPE_SELECTED; // the 'modelType' option value (=foldername) for the select dropdown list
-        var token = ""; // the token value of HF_TOKEN or CIVITAI_API_TOKEN to pass to the corresponding WebUI Password fields on the "Models" tab
-
-        var response;
-        var result;
-
-        if (data !== undefined && data.cmd !== undefined) {
-            cmd = data.cmd;
-            if (cmd === "selectModelType" && data.model_type !== undefined) {
-                model_type = data.model_type; // the model_type which is passed in to select
-            }
-            if ((cmd === "hfToken" || cmd === "civitaiToken") // cmd need to match the DOM id of the Password field on the "Models" tab
-                && data.token !== undefined) {
-                token = data.token; // if token = undefined or empty "", then the corresponding token get fetched from the server
             }
         }
 
-        //alert("extendUIHelper(): cmd=" + cmd +", model_type=" + model_type + ", token=" + token); // debug-info (DISABLED)
-
-        switch (cmd) {
-            case "civitaiToken":
-                if (token === "") { // get the data from the Server
-                    response = await fetch('/get_civitai_token');
-                    result = await response.json();
-                    token = result['token'];
+        function updateAppStatus(data) {
+            for (const [appKey, status] of Object.entries(data)) {
+                // Update status text
+                const statusDiv = document.querySelector(`#apps .app:has(#start-${appKey}) .status`);
+                if (statusDiv) {
+                    statusDiv.textContent = `Status: ${status}`;
                 }
 
-                alert(cmd + "=" + token);
-                // pass tokens from HF or CIVITAI ENV vars into their Password fields
-                document.getElementById(cmd).value = token; //'********'; // indicate a found token, but require to call back
+                // Update button states
+                const startButton = document.getElementById(`start-${appKey}`);
+                const stopButton = document.getElementById(`stop-${appKey}`);
+                const openButton = document.getElementById(`open-${appKey}`);
 
-                break;
-
-            case "hfToken":
-                if (token === "") { // get the data from the Server
-                    response = await fetch('/get_huggingface_token');
-                    result = await response.json();
-                    token = result['token'];
+                if (startButton) {
+                    startButton.disabled = (status === 'running');
                 }
+                if (stopButton) {
+                    stopButton.disabled = (status === 'stopped');
+                }
+                if (openButton) {
+                    openButton.disabled = (status === 'stopped');
+                }
+            }
+        }
+
+        function viewLogs(appKey, appName) {
+            currentLogApp = appKey;
+            currentLogAppName = appName;
+            document.getElementById('currentAppName').textContent = `Logs - ${appName}`;
+            document.getElementById('downloadLogsBtn').style.display = 'flex';
+            updateLogs();
             
-                alert(cmd + "=" + token);
-                // pass tokens from HF or CIVITAI ENV vars into their Password fields
-                document.getElementById(cmd).value = token; //'********'; // indicate a found token, but require to call back
+            // Make sure logs section is visible
+            const logsSection = document.querySelector('.logs-section');
+            if (logsSection) {
+                logsSection.style.display = 'flex';
+            }
+        }
 
-                break;
+        async function stopApp(appKey) {
+            try {
+                const response = await fetch(`/stop/${appKey}`);
+                const data = await response.json();
+                if (data.status === 'stopped' || data.status === 'already_stopped') {
+                    // Update button states
+                    const startButton = document.getElementById(`start-${appKey}`);
+                    const stopButton = document.getElementById(`stop-${appKey}`);
+                    const openButton = document.getElementById(`open-${appKey}`);
 
-            case "refreshModelTypes":
-                // refresh and optionally select the 'modelType' list for "Model Downloader"
-                var modelTypeSelect = document.getElementById('modelType');
-                if (!modelTypeSelect) {
-                    console.error('Model type select element not found');
-                    return;
+                    if (startButton) startButton.disabled = false;  // Enable start button
+                    if (stopButton) stopButton.disabled = true;   // Disable stop button
+                    if (openButton) openButton.disabled = true;   // Disable open button
+
+                    // Update status text
+                    const statusDiv = document.querySelector(`#apps .app:has(#start-${appKey}) .status`);
+                    if (statusDiv) {
+                        statusDiv.textContent = 'Status: stopped';
+                    }
+                } else if (data.status === 'error') {
+                    alert(data.message);
                 }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
 
+        async function openApp(appKey, port) {
+            // *** lutzapps - support to run locally and new support for bkohya gradio url
+            // NOTE: ` (back-ticks) are used here for template literals
+            var url = `https://${podId}-${port}.proxy.runpod.net/`; // need to be declared as var
+            if (`${enable_unsecure_localhost}` === 'True') {
+                url = `http://localhost:${port}/`; // remove runpod.net proxy
+            }
+
+            // new: support gradio url for kohya_ss, e.g. https://b6365c256c395e755b.gradio.live
+            //if (`${appKey}` === 'bkohya' && `${app_status[appKey]['status']}` === 'running') { // get the latest data from the server
+            if (appKey == 'bkohya') { // get the latest data from the server
+                var response = await fetch('/get_bkohya_launch_url');
+                var result = await response.json();
+                
+                var launch_mode = result['mode']; // 'gradio' or 'local'
+                //alert('launch_mode=' + launch_mode);
+
+                var launch_url = result['url'];
+                //alert('launch_url=' + launch_url);
+
+                if (launch_url !== '') { // when a launch url is defined, the app is initialized and ready to be opened
+                    if (launch_mode === 'gradio') { // if it is a gradio url
+                        url = launch_url; // then use it, instead of the above defined CF proxy url
+                        //alert('using gradio for bkohya: ' + launch_url);
+                    }
+                    // else use the CF proxy url defined above for localhost, instead of the localhost url from the log
+                }   
+                else { // empty launch_url, waiting for launch url from log
+                    if (launch_mode === 'gradio') {
+                        alert('Waiting for Gradio URL to be generated ...');
+                    }
+                    else {
+                        alert('Waiting for lokal Launch URL to be generated ...');
+                    }
+                    return; // no lauch Url yet
+                }
+            }
+
+            //alert(`openApp URL=${url}`);
+
+            window.open(url, '_blank'); // open app window as popup window
+        }
+
+        async function updateStatus() {
+            const response = await fetch('/status');
+            const data = await response.json();
+            for (const [appKey, status] of Object.entries(data)) {
+                updateAppStatus(appKey, status);
+            }
+        }
+
+        function updateLogs() {
+            if (currentLogApp) {
+                fetch(`/logs/${currentLogApp}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const logsDiv = document.getElementById('logs');
+                        const wasScrolledToBottom = logsDiv.scrollHeight - logsDiv.clientHeight <= logsDiv.scrollTop + 1;
+                        logsDiv.textContent = data.logs.join('\n');
+                        if (wasScrolledToBottom) {
+                            logsDiv.scrollTop = logsDiv.scrollHeight;
+                        }
+                        document.getElementById('downloadLogsBtn').style.display = 'flex';
+                    });
+            } else {
+                document.getElementById('downloadLogsBtn').style.display = 'none';
+            }
+        }
+
+        async function forceKillApp(appKey) {
+            if (confirm(`Are you sure you want to force kill ${appKey}? This may cause data loss.`)) {
                 try {
-                    // get the data from the Server
-                    response = await fetch('/get_model_types');
-                    result = await response.json();
+                    const response = await fetch(`/force_kill/${appKey}`, { method: 'POST' });
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    if (data.status === 'killed') {
+                        updateAppStatus(appKey, 'stopped');
+                        alert(data.message);
+                    } else {
+                        alert(`Error: ${data.message}`);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert(`Error killing ${appKey}: ${error.message}`);
+                }
+                await updateStatus();
+            }
+        }
 
-                    var model_types = result; // get the JSON-Object
-                    var count = Object.keys(model_types).length;
+        function initializeUI() {
+            updateStatus();
+            // TODO: need a way this 2 functions not pollute the logs every second or 5 seconds
+            setInterval(updateStatus, 5000);
+            setInterval(updateLogs, 1000);
 
-                    var modelTypeSelected = modelTypeSelect.value; // remember the current selected modelType.option value
-                    modelTypeSelect.options.length = 0; // clear all current modelTypeSelect options
+            // Initialize model types
+            refreshModelTypes();
+        }
 
-                    if (count === 0) {
-                        // Add a default option if no model types are available
-                        const defaultOption = document.createElement('option');
-                        defaultOption.text = 'Please create shared folders first';
-                        defaultOption.value = '';
-                        modelTypeSelect.add(defaultOption);
+        async function refreshModelTypes() {
+            var data = {};
+            data.cmd = 'refreshModelTypes';
+            await extendUIHelper(data); // lutzapps - initialize the available SHARED_MODEL_FOLDERS for the "Model Downloader" modelType select list
+        }
+
+        // lutzapps - populate modeltype select options from shared_models
+        async function extendUIHelper(data) {
+            // check the data
+            // if no data is passed, the default cmd is "selectModelType" with no specific "model_type",
+            // which means to re-select the last selected modelType option from the global var MODELTYPE_SELECTED
+            var cmd = "selectModelType"; // default cmd, when called with empty data or empty cmd
+            var model_type = MODELTYPE_SELECTED; // the 'modelType' option value (=foldername) for the select dropdown list
+            var token = ""; // the token value of HF_TOKEN or CIVITAI_API_TOKEN to pass to the corresponding WebUI Password fields on the "Models" tab
+
+            var response;
+            var result;
+
+            if (data !== undefined && data.cmd !== undefined) {
+                cmd = data.cmd;
+                if (cmd === "selectModelType" && data.model_type !== undefined) {
+                    model_type = data.model_type; // the model_type which is passed in to select
+                }
+                if ((cmd === "hfToken" || cmd === "civitaiToken") // cmd need to match the DOM id of the Password field on the "Models" tab
+                    && data.token !== undefined) {
+                    token = data.token; // if token = undefined or empty "", then the corresponding token get fetched from the server
+                }
+            }
+
+            //alert("extendUIHelper(): cmd=" + cmd +", model_type=" + model_type + ", token=" + token); // debug-info (DISABLED)
+
+            switch (cmd) {
+                case "civitaiToken":
+                    if (token === "") { // get the data from the Server
+                        response = await fetch('/get_civitai_token');
+                        result = await response.json();
+                        token = result['token'];
+                    }
+
+                    alert(cmd + "=" + token);
+                    // pass tokens from HF or CIVITAI ENV vars into their Password fields
+                    document.getElementById(cmd).value = token; //'********'; // indicate a found token, but require to call back
+
+                    break;
+
+                case "hfToken":
+                    if (token === "") { // get the data from the Server
+                        response = await fetch('/get_huggingface_token');
+                        result = await response.json();
+                        token = result['token'];
+                    }
+                
+                    alert(cmd + "=" + token);
+                    // pass tokens from HF or CIVITAI ENV vars into their Password fields
+                    document.getElementById(cmd).value = token; //'********'; // indicate a found token, but require to call back
+
+                    break;
+
+                case "refreshModelTypes":
+                    // refresh and optionally select the 'modelType' list for "Model Downloader"
+                    var modelTypeSelect = document.getElementById('modelType');
+                    if (!modelTypeSelect) {
+                        console.error('Model type select element not found');
                         return;
                     }
 
-                    for (i = 0; i < count; i++) {
-                        modelTypeOption = document.createElement('option');
-                        modelType = model_types[String(i)]['modelfolder'];
-                        modelTypeOption.setAttribute('value', modelType);
-                        modelTypeOption.appendChild(document.createTextNode(model_types[String(i)]['desc']));
-                        modelTypeSelect.appendChild(modelTypeOption);
+                    try {
+                        // get the data from the Server
+                        response = await fetch('/get_model_types');
+                        result = await response.json();
+
+                        var model_types = result; // get the JSON-Object
+                        var count = Object.keys(model_types).length;
+
+                        var modelTypeSelected = modelTypeSelect.value; // remember the current selected modelType.option value
+                        modelTypeSelect.options.length = 0; // clear all current modelTypeSelect options
+
+                        if (count === 0) {
+                            // Add a default option if no model types are available
+                            const defaultOption = document.createElement('option');
+                            defaultOption.text = 'Please create shared folders first';
+                            defaultOption.value = '';
+                            modelTypeSelect.add(defaultOption);
+                            return;
+                        }
+
+                        for (i = 0; i < count; i++) {
+                            modelTypeOption = document.createElement('option');
+                            modelType = model_types[String(i)]['modelfolder'];
+                            modelTypeOption.setAttribute('value', modelType);
+                            modelTypeOption.appendChild(document.createTextNode(model_types[String(i)]['desc']));
+                            modelTypeSelect.appendChild(modelTypeOption);
+                        }
+
+                        if (modelTypeSelected === "") {
+                            modelTypeSelect.selectedIndex = 0;
+                            MODELTYPE_SELECTED = modelTypeSelect.options[0].value;
+                        } else {
+                            modelTypeSelect.value = modelTypeSelected;
+                            MODELTYPE_SELECTED = modelTypeSelected;
+                        }
+                    } catch (error) {
+                        console.error('Error refreshing model types:', error);
                     }
+                    break;
 
-                    if (modelTypeSelected === "") {
-                        modelTypeSelect.selectedIndex = 0;
-                        MODELTYPE_SELECTED = modelTypeSelect.options[0].value;
-                    } else {
-                        modelTypeSelect.value = modelTypeSelected;
-                        MODELTYPE_SELECTED = modelTypeSelected;
-                    }
-                } catch (error) {
-                    console.error('Error refreshing model types:', error);
-                }
-                break;
+                case "selectModelType":
+                    // this is called by model_utils:download_civitai_model() which passed the downloading 'model_type'
+                    // to select for clarity, which can be different from the currently selected modelType option
+                    // if called without a 'model_type', the last MODELTYPE_SELECTED will be selected (after a "Tab Switch")
 
-            case "selectModelType":
-                // this is called by model_utils:download_civitai_model() which passed the downloading 'model_type'
-                // to select for clarity, which can be different from the currently selected modelType option
-                // if called without a 'model_type', the last MODELTYPE_SELECTED will be selected (after a "Tab Switch")
+                    // refresh and optionally select the 'modelType' list for "Model Downloader"
+                    var modelTypeSelect = document.getElementById('modelType');
+                    modelTypeSelect.value = model_type;
+                    MODELTYPE_SELECTED = model_type; // NOT handled by the onchange() event handler
 
-                // refresh and optionally select the 'modelType' list for "Model Downloader"
-                var modelTypeSelect = document.getElementById('modelType');
-                modelTypeSelect.value = model_type;
-                MODELTYPE_SELECTED = model_type; // NOT handled by the onchange() event handler
+                    break;
 
-                break;
-
-            default: // no cmd passed is same as "selectModelType" without a 'model_type'
-                // this is already handled by "selectModelType" defaults, there is no "default" case needed here
-        }
-    }
-
-    async function downloadModel() {
-        const url = document.getElementById('modelUrl').value;
-        const modelName = document.getElementById('modelName').value;
-        const modelType = document.getElementById('modelType').value;
-        //const hfToken = document.getElementById('hfToken').value;
-        let hfToken = null;
-        let civitaiToken = null;
-
-        // lutzapps - support HF_TOKEN ENV var
-        // Check if the URL is from Huggingface
-        if (url.toLowerCase().includes('huggingface.co')) { // be case-insensitive with this url
-            hfToken = document.getElementById('hfToken').value;
-            if (hfToken === '********') {
-                // if the token is masked, fetch it from the server
-                const response = await fetch('/get_huggingface_token');
-                const result = await response.json();
-                hfToken = result.token;
+                default: // no cmd passed is same as "selectModelType" without a 'model_type'
+                    // this is already handled by "selectModelType" defaults, there is no "default" case needed here
             }
-        }        
-        // Check if the URL is from Civitai
-        if (url.toLowerCase().includes('civitai.com')) { // lutzapps - be case-insensitive with this url
-            civitaiToken = document.getElementById('civitaiToken').value;
-            if (civitaiToken === '********') {
-                // If the token is masked, fetch it from the server
-                const response = await fetch('/get_civitai_token');
-                const result = await response.json();
-                civitaiToken = result.token;
+        }
+
+        async function downloadModel() {
+            const url = document.getElementById('modelUrl').value;
+            const modelName = document.getElementById('modelName').value;
+            const modelType = document.getElementById('modelType').value;
+            //const hfToken = document.getElementById('hfToken').value;
+            let hfToken = null;
+            let civitaiToken = null;
+
+            // lutzapps - support HF_TOKEN ENV var
+            // Check if the URL is from Huggingface
+            if (url.toLowerCase().includes('huggingface.co')) { // be case-insensitive with this url
+                hfToken = document.getElementById('hfToken').value;
+                if (hfToken === '********') {
+                    // if the token is masked, fetch it from the server
+                    const response = await fetch('/get_huggingface_token');
+                    const result = await response.json();
+                    hfToken = result.token;
+                }
+            }        
+            // Check if the URL is from Civitai
+            if (url.toLowerCase().includes('civitai.com')) { // lutzapps - be case-insensitive with this url
+                civitaiToken = document.getElementById('civitaiToken').value;
+                if (civitaiToken === '********') {
+                    // If the token is masked, fetch it from the server
+                    const response = await fetch('/get_civitai_token');
+                    const result = await response.json();
+                    civitaiToken = result.token;
+                }
+                
+                if (!civitaiToken) {
+                    alert('Civitai API token is required for Civitai URLs. Please enter it in the Civitai API Token field.');
+                    return;
+                }
             }
             
-            if (!civitaiToken) {
-                alert('Civitai API token is required for Civitai URLs. Please enter it in the Civitai API Token field.');
-                return;
-            }
+            await startModelDownload(url, modelName, modelType, civitaiToken, hfToken);
         }
-        
-        await startModelDownload(url, modelName, modelType, civitaiToken, hfToken);
-    }
 
 
-    async function startModelDownload(url, modelName, modelType, civitaiToken, hfToken, versionId = null, fileIndex = null) {
-        const progressBar = document.querySelector('#model-download-progress .progress-bar-fill');
-        const statusDiv = document.getElementById('model-download-status');
-        const speedDiv = document.getElementById('model-download-speed');
-        const etaDiv = document.getElementById('model-download-eta');
+        async function startModelDownload(url, modelName, modelType, civitaiToken, hfToken, versionId = null, fileIndex = null) {
+            const progressBar = document.querySelector('#model-download-progress .progress-bar-fill');
+            const statusDiv = document.getElementById('model-download-status');
+            const speedDiv = document.getElementById('model-download-speed');
+            const etaDiv = document.getElementById('model-download-eta');
 
-        document.getElementById('model-download-progress').style.display = 'block';
-        progressBar.style.width = '0%';
-        progressBar.textContent = '0%';
-        statusDiv.textContent = 'Starting download...';
-        speedDiv.textContent = '';
-        etaDiv.textContent = '';
+            document.getElementById('model-download-progress').style.display = 'block';
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+            statusDiv.textContent = 'Starting download...';
+            speedDiv.textContent = '';
+            etaDiv.textContent = '';
 
-        try {
-            const response = await fetch('/download_model', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 
-                    url, 
-                    model_name: modelName, 
-                    model_type: modelType,
-                    civitai_token: civitaiToken,
-                    hf_token: hfToken,
-                    version_id: versionId,
-                    file_index: fileIndex
-                }),
-            });
+            try {
+                const response = await fetch('/download_model', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        url, 
+                        model_name: modelName, 
+                        model_type: modelType,
+                        civitai_token: civitaiToken,
+                        hf_token: hfToken,
+                        version_id: versionId,
+                        file_index: fileIndex
+                    }),
+                });
 
-            const result = await response.json();
-            if (result.status === 'success') {
-                statusDiv.textContent = result.message;
-                progressBar.style.width = '100%';
-                progressBar.textContent = '100%';
-                await loadModelFolders();
-                // Remove showRecreateSymlinksButton call since it's automatic now
-            } else if (result.status === 'choice_required') {
-                if (result.data.type === 'file') {
-                    showFileChoiceDialog(result.data, url, modelName, modelType, civitaiToken, hfToken);
-                } else if (result.data.type === 'version') {
-                    showVersionChoiceDialog(result.data, url, modelName, modelType, civitaiToken, hfToken);
+                const result = await response.json();
+                if (result.status === 'success') {
+                    statusDiv.textContent = result.message;
+                    progressBar.style.width = '100%';
+                    progressBar.textContent = '100%';
+                    await loadModelFolders();
+                    // Remove showRecreateSymlinksButton call since it's automatic now
+                } else if (result.status === 'choice_required') {
+                    if (result.data.type === 'file') {
+                        showFileChoiceDialog(result.data, url, modelName, modelType, civitaiToken, hfToken);
+                    } else if (result.data.type === 'version') {
+                        showVersionChoiceDialog(result.data, url, modelName, modelType, civitaiToken, hfToken);
+                    }
+                } else {
+                    statusDiv.textContent = `Error: ${result.message}`;
                 }
-            } else {
-                statusDiv.textContent = `Error: ${result.message}`;
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.textContent = `Error: ${error.message}`;
             }
-        } catch (error) {
-            console.error('Error:', error);
-            statusDiv.textContent = `Error: ${error.message}`;
         }
-    }
 
-    function showVersionChoiceDialog(data, url, modelName, modelType, civitaiToken, hfToken) {
+
+        function showVersionChoiceDialog(data, url, modelName, modelType, civitaiToken, hfToken) {
         const dialogContent = `
             <h3>Multiple versions available. Please choose one:</h3>
             <ul>
@@ -3166,465 +3250,144 @@
         showDialog(dialogContent);
     }
 
-    function showFileChoiceDialog(data, url, modelName, modelType, civitaiToken, hfToken) {
-        const modalContent = `
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <h3>Multiple files available. Please choose one:</h3>
-                <ul>
-                    ${data.files.map((file, index) => `
-                        <li>
-                            <button onclick="selectFile(${index}, '${url}', '${modelName}', '${modelType}', '${civitaiToken}', '${hfToken}', ${data.version_id})">
-                                ${file.name} (${formatSize(file.size * 1024)}, Type: ${file.type})
-                            </button>
-                        </li>
-                    `).join('')}
-                </ul>
-            </div>
-        `;
-        
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.innerHTML = modalContent;
-        document.body.appendChild(modal);
-        
-        modal.style.display = 'block';
-        
-        const closeBtn = modal.querySelector('.close');
-        closeBtn.onclick = function() {
-            document.body.removeChild(modal);
-        }
-        
-        window.onclick = function(event) {
-            if (event.target == modal) {
+        function showFileChoiceDialog(data, url, modelName, modelType, civitaiToken, hfToken) {
+            const modalContent = `
+                <div class="modal-content">
+                    <span class="close">&times;</span>
+                    <h3>Multiple files available. Please choose one:</h3>
+                    <ul>
+                        ${data.files.map((file, index) => `
+                            <li>
+                                <button onclick="selectFile(${index}, '${url}', '${modelName}', '${modelType}', '${civitaiToken}', '${hfToken}', ${data.version_id})">
+                                    ${file.name} (${formatSize(file.size * 1024)}, Type: ${file.type})
+                                </button>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.innerHTML = modalContent;
+            document.body.appendChild(modal);
+            
+            modal.style.display = 'block';
+            
+            const closeBtn = modal.querySelector('.close');
+            closeBtn.onclick = function() {
                 document.body.removeChild(modal);
             }
-        }
-    } // Added missing closing bracket here
-
-    function selectVersion(versionId, url, modelName, modelType, civitaiToken, hfToken) {
-        document.body.removeChild(document.body.lastChild); // Remove the dialog
-        startModelDownload(url, modelName, modelType, civitaiToken, hfToken, versionId);
-    }
-
-    function selectFile(fileIndex, url, modelName, modelType, civitaiToken, hfToken, versionId) {
-        const modal = document.querySelector('.modal');
-        document.body.removeChild(modal);
-        startModelDownload(url, modelName, modelType, civitaiToken, hfToken, versionId, fileIndex);
-    }
-
-    async function loadModelFolders() {
-        try {
-            const response = await fetch('/get_model_folders');
-            const folders = await response.json();
-            const modelFoldersDiv = document.getElementById('model-folders');
-            modelFoldersDiv.innerHTML = '';
-
-            for (const [folderName, folderInfo] of Object.entries(folders)) {
-                const folderDiv = document.createElement('div');
-                folderDiv.className = 'model-folder';
-                folderDiv.innerHTML = `
-                    <h4>${folderName}</h4>
-                    <p>Size: ${folderInfo.size}</p>
-                    <p>Files: ${folderInfo.file_count}</p>
-                `;
-                modelFoldersDiv.appendChild(folderDiv);
-            }
-        } catch (error) {
-            console.error('Error loading model folders:', error);
-        }
-    }
-
-    async function saveCivitaiToken() {
-        const token = document.getElementById('civitaiTokenSave').value;
-        try {
-            const response = await fetch('/save_civitai_token', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ token: token }),
-            });
-            const result = await response.json();
-            if (result.status === 'success') {
-                document.getElementById('civitaiTokenStatus').textContent = 'Token saved successfully.';
-                document.getElementById('civitaiToken').value = '********';
-                document.getElementById('civitaiTokenSave').value = '********';
-            } else {
-                document.getElementById('civitaiTokenStatus').textContent = `Error: ${result.message}`;
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            document.getElementById('civitaiTokenStatus').textContent = `Error: ${error.message}`;
-        }
-    }
-
-    async function loadCivitaiToken() {
-        try {
-            const response = await fetch('/get_civitai_token');
-            const result = await response.json();
-            if (result.token) {
-                document.getElementById('civitaiToken').value = '********';
-                document.getElementById('civitaiTokenSave').value = '********';
-            }
-        } catch (error) {
-            console.error('Error loading Civitai token:', error);
-        }
-    }
-
-    // lutzapps - added HF_TOKEN support
-    async function loadHFToken() {
-        try {
-            const response = await fetch('/get_huggingface_token');
-            const result = await response.json();
-            if (result.token) {
-                document.getElementById('hfToken').value = '********';
-            }
-        } catch (error) {
-            console.error('Error loading Huggingface token:', error);
-        }
-    }
-
-    function formatSize(sizeInBytes) {
-        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-        let size = sizeInBytes;
-        let unitIndex = 0;
-        while (size >= 1024 && unitIndex < units.length - 1) {
-            size /= 1024;
-            unitIndex++;
-        }
-        return `${size.toFixed(2)} ${units[unitIndex]}`;
-    }
-
-    function formatTime(seconds) {
-        if (isNaN(seconds) || seconds < 0) {
-            return 'Calculating...';
-        }
-        if (seconds < 60) {
-            return `${seconds} seconds`;
-        } else if (seconds < 3600) {
-            return `${Math.floor(seconds / 60)} minutes ${seconds % 60} seconds`;
-        } else {
-            const hours = Math.floor(seconds / 3600);
-            const minutes = Math.floor((seconds % 3600) / 60);
-            return `${hours} hours ${minutes} minutes`;
-        }
-    }
-
-    // Example URLs - lutzapps - TODO: enrich data
-    const exampleUrls = {
-        'Stable-diffusion': 'https://civitai.com/models/90352/dreamshaper',
-        'Lora': 'https://civitai.com/models/58390?modelVersionId=62833',
-        'VAE': 'https://huggingface.co/stabilityai/sd-vae-ft-mse-original/blob/main/vae-ft-mse-840000-ema-pruned.safetensors',
-        'ESRGAN': 'https://civitai.com/models/116225?modelVersionId=125843',
-        'Flux-Dev': 'https://civitai.com/models/618692?modelVersionId=691639',
-        'Flux-Schnell': 'https://civitai.com/models/618692?modelVersionId=699279'
-    };
-
-    function updateExampleUrls() {
-        document.getElementById('example-sd').textContent = exampleUrls['Stable-diffusion'];
-        document.getElementById('example-lora').textContent = exampleUrls['Lora'];
-        document.getElementById('example-vae').textContent = exampleUrls['VAE'];
-        document.getElementById('example-upscaler').textContent = exampleUrls['ESRGAN'];
-        document.getElementById('example-flux-dev').textContent = exampleUrls['Flux-Dev'];
-        document.getElementById('example-flux-schnell').textContent = exampleUrls['Flux-Schnell'];
-    }
-
-    // lutzapps - replace function copyToClipboard() with function useInModelDownloader()
-    function useInModelDownloader(modelType, modelUrl) {
-        // copy the downloadUrl in the Model Downloader "Url" textbox
-        document.getElementById('modelUrl').value = modelUrl;
-
-        // select the modelType in the modelType select list, we are just about to download
-        var data = {};
-        data.cmd = 'selectModelType';
-        data.model_type = modelType;
-        extendUIHelper(data);
-
-        navigator.clipboard.writeText(modelUrl).then(() => {
-            alert('URL copied to Downloader and into the Clipboard!');
-        }, (err) => {
-            console.error('Could not copy text: ', err);
-        });
-    }
-
-    // Call this function when the Models tab is opened
-    document.querySelector('.navbar-tabs a[onclick="openTab(event, \'models-tab\')"]').addEventListener('click', function() {
-        loadModelFolders();
-        refreshModelTypes();  // Refresh model types when switching to Models tab
-        loadCivitaiToken();
-        loadHFToken();
-        updateExampleUrls();
-    });
-
-    // Initialize WebSocket connection
-    connectWebSocket();
-
-    // ... (keep any remaining code)
-
-    function openTab(evt, tabName) {
-        var i, tabContent, tabLinks;
-        tabContent = document.getElementsByClassName("tab-content");
-        for (i = 0; i < tabContent.length; i++) {
-            tabContent[i].style.display = "none";
-        }
-        tabLinks = document.getElementsByClassName("tab-link");
-        for (i = 0; i < tabLinks.length; i++) {
-            tabLinks[i].className = tabLinks[i].className.replace(" active", "");
-        }
-        document.getElementById(tabName).style.display = "block";
-        evt.currentTarget.className += " active";
-
-        // Additional actions when switching tabs
-        if (tabName === 'apps-tab') {
-            document.querySelector('.logs-section').style.display = 'flex';
-            updateLogs(); // Refresh logs when switching back to the "Apps" tab
-        } else if (tabName === 'models-tab') {
-            // lutzapps - the following event handler functions already fired
-            // in the queryselector eventhandler (esspecially for the "models-tab" tab)
-            //loadModelFolders();
-            //loadCivitaiToken();
-            //loadHFToken(); // lutzapps - added HF_TOKEN Support
-        } else if (tabName === 'settings-tab') {
-            loadSshDetails();
-            updateFileBrowserStatus();
-        }
-    }
-
-    function loadSshDetails() {
-        const ip = '{{ RUNPOD_PUBLIC_IP }}';
-        const port = '{{ RUNPOD_TCP_PORT_22 }}';
-        const sshCommand = `ssh root@${ip} -p ${port}`;
-        document.getElementById('sshIp').textContent = ip;
-        document.getElementById('sshPort').textContent = port;
-        document.getElementById('sshCommand').textContent = sshCommand;
-
-        const newSshPassword = document.getElementById('newSshPassword');
-        const passwordButtons = document.querySelector('.password-buttons');
-        
-        if ('{{ ssh_password_status }}' === 'set') {
-            newSshPassword.placeholder = "Password is set (hidden)";
-            passwordButtons.style.display = 'flex';
-        } else {
-            newSshPassword.placeholder = "Enter new SSH password";
-            passwordButtons.style.display = 'flex';
-        }
-    }
-
-    // Add this at the end of your script section
-    document.addEventListener('DOMContentLoaded', function() {
-        loadSshDetails();
-        // ... any other initialization code ...
-    });
-
-    function copySshCommand() {
-            const sshCommand = document.getElementById('sshCommand').textContent;
-            navigator.clipboard.writeText(sshCommand).then(() => {
-                alert('SSH command copied to clipboard!');
-            }, (err) => {
-                console.error('Could not copy text: ', err);
-                alert('Failed to copy SSH command. Please copy it manually.');
-            });
-        }
-
-    function togglePasswordVisibility() {
-            const passwordInput = document.getElementById('newSshPassword');
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                if (passwordInput.placeholder === "Password is set (hidden)") {
-                    passwordInput.value = "{{ ssh_password }}";
-                }
-                } else {
-                passwordInput.type = 'password';
-                if (passwordInput.value === "{{ ssh_password }}") {
-                    passwordInput.value = '';
-                    passwordInput.placeholder = "Password is set (hidden)";
+            
+            window.onclick = function(event) {
+                if (event.target == modal) {
+                    document.body.removeChild(modal);
                 }
             }
+        } // Added missing closing bracket here
+
+        function selectVersion(versionId, url, modelName, modelType, civitaiToken, hfToken) {
+            document.body.removeChild(document.body.lastChild); // Remove the dialog
+            startModelDownload(url, modelName, modelType, civitaiToken, hfToken, versionId);
         }
 
-    async function setCustomSshPassword() {
-            const newPassword = document.getElementById('newSshPassword').value;
-            if (!newPassword) {
-                alert('Please enter a password.');
+        function selectFile(fileIndex, url, modelName, modelType, civitaiToken, hfToken, versionId) {
+            const modal = document.querySelector('.modal');
+            document.body.removeChild(modal);
+            startModelDownload(url, modelName, modelType, civitaiToken, hfToken, versionId, fileIndex);
+        }
+
+        async function loadModelFolders() {
+            try {
+                const response = await fetch('/get_model_folders');
+                const folders = await response.json();
+                const modelFoldersDiv = document.getElementById('model-folders');
+                modelFoldersDiv.innerHTML = '';
+
+                for (const [folderName, folderInfo] of Object.entries(folders)) {
+                    const folderDiv = document.createElement('div');
+                    folderDiv.className = 'model-folder';
+                    folderDiv.innerHTML = `
+                        <h4>${folderName}</h4>
+                        <p>Size: ${folderInfo.size}</p>
+                        <p>Files: ${folderInfo.file_count}</p>
+                    `;
+                    modelFoldersDiv.appendChild(folderDiv);
+                }
+            } catch (error) {
+                console.error('Error loading model folders:', error);
+            }
+        }
+
+        async function saveCivitaiToken() {
+            // Get token from the main Civitai token input field
+            const token = document.getElementById('civitaiToken').value;
+            if (!token) {
+                alert('Please enter a Civitai API token');
                 return;
             }
-            
-            if (confirm('Warning: Password-based SSH authentication is less secure than key-based authentication. Are you sure you want to set a password?')) {
-                try {
-                    const response = await fetch('/set_ssh_password', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ password: newPassword }),
-                    });
-                    const result = await response.json();
-                    if (result.status === 'success') {
-                        alert('SSH password set successfully.');
-                        document.getElementById('newSshPassword').value = '';
-                        document.getElementById('newSshPassword').placeholder = 'Password is set (hidden)';
-                    } else {
-                        alert('Failed to set SSH password: ' + result.message);
-                    }
-                } catch (error) {
-                    console.error('Error setting SSH password:', error);
-                    alert('An error occurred while setting the SSH password.');
-                }
-            }
-        }
 
-    function openFileBrowser() {
-        const podId = '{{ pod_id }}';
-
-        // *** lutzapps - Change #5 - support to run locally
-        // NOTE: ` (back-ticks) are used here for template literals
-        var url = `https://${podId}-7222.proxy.runpod.net/fileapp/`; // need to be declared as var
-        if (`${enable_unsecure_localhost}` === 'True') {
-            url = `http://localhost:7222/fileapp/`; // remove runpod.net proxy
-            //alert(`FileBrowser URL=${url}`);
-        }
-
-        window.open(url, '_blank');
-    }
-
-        async function controlFileBrowser(action) {
             try {
-                const response = await fetch(`/${action}_filebrowser`);
+                const response = await fetch('/save_civitai_token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ token: token }),
+                });
                 const result = await response.json();
-                if (result.status === 'started' || result.status === 'stopped') {
-                    updateFileBrowserStatus();
-                }
-            } catch (error) {
-                console.error('Error controlling File Browser:', error);
-            }
-        }
-
-        function updateFileBrowserStatus() {
-            fetch('/filebrowser_status')
-                .then(response => response.json())
-                .then(data => {
-                    const statusElement = document.getElementById('filebrowser-status');
-                    if (statusElement) {
-                        statusElement.textContent = data.status;
-                    }
-                    const startButton = document.getElementById('start-filebrowser');
-                    const stopButton = document.getElementById('stop-filebrowser');
-                    if (startButton && stopButton) {
-                        startButton.disabled = (data.status === 'running');
-                        stopButton.disabled = (data.status === 'stopped');
-                    }
-                })
-                .catch(error => console.error('Error updating File Browser status:', error));
-        }
-
-        // Reduce the frequency of status updates
-        setInterval(updateFileBrowserStatus, 30000); // Check every 30 seconds instead of 5 seconds
-
-        // Update the DOMContentLoaded event listener
-        document.addEventListener('DOMContentLoaded', function() {
-            updateFileBrowserStatus();
-            // ... (other initialization code)
-        });
-    // Call this function when the Settings tab is opened
-    document.querySelector('.navbar-tabs a[onclick="openTab(event, \'settings-tab\')"]').addEventListener('click', function() {
-        loadSshDetails();
-        updateFileBrowserStatus();
-    });
-
-    async function installApp(appKey) {
-            const installButton = document.getElementById(`install-${appKey}`);
-            const progressContainer = document.getElementById(`install-progress-${appKey}`);
-            const logsContainer = document.getElementById(`install-logs-${appKey}`);
-
-            installButton.disabled = true;
-            progressContainer.style.display = 'block';
-            logsContainer.style.display = 'block';
-            logsContainer.textContent = '';
-
-            try {
-                const response = await fetch(`/install/${appKey}`, { method: 'POST' });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const contentType = response.headers.get("content-type");
-                if (contentType && contentType.indexOf("application/json") !== -1) {
-                    const data = await response.json();
-                    if (data.status !== 'success') {
-                        throw new Error(data.message);
-                    }
+                if (result.status === 'success') {
+                    // Update both token fields to show it's saved
+                    document.getElementById('civitaiToken').value = '********';
+                    document.getElementById('civitaiTokenSave').value = '********';
+                    alert('Civitai token saved successfully.');
                 } else {
-                    throw new Error("Received non-JSON response from server");
+                    alert(`Error: ${result.message}`);
                 }
-
-                // Don't reload the page here, wait for the WebSocket 'install_complete' message
             } catch (error) {
-                console.error('Installation error:', error);
-                appendToInstallLogs({app_name: appKey, log: `Error: ${error.message}`});
+                console.error('Error:', error);
+                alert(`Error: ${error.message}`);
             }
-        // Don't re-enable the button here, it will be handled by the WebSocket messages
-    }
-
-    // Update the WebSocket message handler
-    socket.onmessage = function(event) {
-        try {
-            const data = JSON.parse(event.data);
-            console.log("WebSocket message received:", data);
-
-            if (data.type === 'heartbeat') {
-                // Reset heartbeat timeout on receiving heartbeat response
-                resetHeartbeatTimeout();
-            } else if (data.type === 'install_progress') {
-                updateInstallProgress(data.data);
-            } else if (data.type === 'install_log') {
-                appendToInstallLogs(data.data);
-            } else if (data.type === 'model_download_progress') {
-                updateModelDownloadProgress(data.data);
-            } else if (data.type === 'status_update') {
-                updateAppStatus(data.data);
-            // lutzapps - use the extendUIHelper to "bridge" certain extensions between Python and JavaScript
-            } else if (data.type === 'extend_ui_helper') {
-                extendUIHelper(data.data);
-            }
-            // Handle other message types as needed
-        } catch (error) {
-            console.error('Error parsing WebSocket message:', error, 'Raw message:', event.data);
         }
-    };
 
-    function updateInstallProgress(data) {
-            const progressContainer = document.getElementById(`install-progress-${data.app_name}`);
-            const downloadProgress = progressContainer.querySelector('.download-progress');
-            const unpackProgress = progressContainer.querySelector('.unpack-progress');
-            const speedDisplay = progressContainer.querySelector('.download-speed');
-            const etaDisplay = progressContainer.querySelector('.download-eta');
-            const stageDisplay = progressContainer.querySelector('.install-stage');
-            
-            progressContainer.style.display = 'block';
-            
-            if (data.stage === 'Downloading') {
-                downloadProgress.style.width = `${data.percentage}%`;
-                downloadProgress.textContent = `${data.percentage.toFixed(2)}%`;
-                speedDisplay.textContent = `Speed: ${data.speed}`;
-                etaDisplay.textContent = `ETA: ${formatTime(parseInt(data.eta))}`;
-            } else if (data.stage === 'Unpacking') {
-                unpackProgress.style.width = `${data.percentage}%`;
-                unpackProgress.textContent = `${data.percentage.toFixed(2)}%`;
-                speedDisplay.textContent = `Processed: ${data.processed} / ${data.total} files`;
-                etaDisplay.textContent = '';
-            } else if (data.stage === 'Download Complete') {
-                downloadProgress.style.width = '100%';
-                downloadProgress.textContent = '100%';
-                speedDisplay.textContent = '';
-                etaDisplay.textContent = '';
+        async function loadCivitaiToken() {
+            try {
+                const response = await fetch('/get_civitai_token');
+                const result = await response.json();
+                if (result.token) {
+                    document.getElementById('civitaiToken').value = '********';
+                    document.getElementById('civitaiTokenSave').value = '********';
+                }
+            } catch (error) {
+                console.error('Error loading Civitai token:', error);
             }
-            
-        stageDisplay.textContent = `Stage: ${data.stage}`;
-    }
+        }
 
-    function formatTime(seconds) {
+        // lutzapps - added HF_TOKEN support
+        async function loadHFToken() {
+            try {
+                const response = await fetch('/get_huggingface_token');
+                const result = await response.json();
+                if (result.token) {
+                    document.getElementById('hfToken').value = '********';
+                }
+            } catch (error) {
+                console.error('Error loading Huggingface token:', error);
+            }
+        }
+
+        function formatSize(bytes) {
+            if (!bytes || isNaN(bytes)) return '0 B';
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), sizes.length - 1);
+            const size = bytes / Math.pow(1024, i);
+            return `${size.toFixed(2)} ${sizes[i]}`;
+        }
+
+        function formatTime(seconds) {
+            if (isNaN(seconds) || seconds < 0) {
+                return 'Calculating...';
+            }
             if (seconds < 60) {
                 return `${seconds} seconds`;
             } else if (seconds < 3600) {
@@ -3636,57 +3399,382 @@
             }
         }
 
-        function appendToInstallLogs(data) {
-            const logsContainer = document.getElementById(`install-logs-${data.app_name}`);
-            const logEntry = document.createElement('div');
-            logEntry.textContent = data.log;
-            logsContainer.appendChild(logEntry);
-            logsContainer.scrollTop = logsContainer.scrollHeight;
+        // Example URLs - lutzapps - TODO: enrich data
+        const exampleUrls = {
+            'Stable-diffusion': 'https://civitai.com/models/90352/dreamshaper',
+            'Lora': 'https://civitai.com/models/58390?modelVersionId=62833',
+            'VAE': 'https://huggingface.co/stabilityai/sd-vae-ft-mse-original/blob/main/vae-ft-mse-840000-ema-pruned.safetensors',
+            'ESRGAN': 'https://civitai.com/models/116225?modelVersionId=125843',
+            'Flux-Dev': 'https://civitai.com/models/618692?modelVersionId=691639',
+            'Flux-Schnell': 'https://civitai.com/models/618692?modelVersionId=699279'
+        };
+
+        function updateExampleUrls() {
+            document.getElementById('example-sd').textContent = exampleUrls['Stable-diffusion'];
+            document.getElementById('example-lora').textContent = exampleUrls['Lora'];
+            document.getElementById('example-vae').textContent = exampleUrls['VAE'];
+            document.getElementById('example-upscaler').textContent = exampleUrls['ESRGAN'];
+            document.getElementById('example-flux-dev').textContent = exampleUrls['Flux-Dev'];
+            document.getElementById('example-flux-schnell').textContent = exampleUrls['Flux-Schnell'];
         }
 
-        function handleInstallComplete(data) {
-            const installButton = document.getElementById(`install-${data.app_name}`);
-            if (data.status === 'success') {
-                console.log(data.message);
-                location.reload();  // Reload the page to reflect the new installation status
+        // lutzapps - replace function copyToClipboard() with function useInModelDownloader()
+        function useInModelDownloader(modelType, modelUrl) {
+            // copy the downloadUrl in the Model Downloader "Url" textbox
+            document.getElementById('modelUrl').value = modelUrl;
+
+            // select the modelType in the modelType select list, we are just about to download
+            var data = {};
+            data.cmd = 'selectModelType';
+            data.model_type = modelType;
+            extendUIHelper(data);
+
+            navigator.clipboard.writeText(modelUrl).then(() => {
+                alert('URL copied to Downloader and into the Clipboard!');
+            }, (err) => {
+                console.error('Could not copy text: ', err);
+            });
+        }
+
+        // Call this function when the Models tab is opened
+        document.querySelector('.navbar-tabs a[onclick="openTab(event, \'models-tab\')"]').addEventListener('click', function() {
+            loadModelFolders();
+            refreshModelTypes();  // Refresh model types when switching to Models tab
+            loadCivitaiToken();
+            loadHFToken();
+            updateExampleUrls();
+        });
+
+        // Initialize WebSocket connection
+        connectWebSocket();
+
+        // ... (keep any remaining code)
+
+        function openTab(evt, tabName) {
+            var i, tabContent, tabLinks;
+            tabContent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabContent.length; i++) {
+                tabContent[i].style.display = "none";
+            }
+            tabLinks = document.getElementsByClassName("tab-link");
+            for (i = 0; i < tabLinks.length; i++) {
+                tabLinks[i].className = tabLinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+
+            // Additional actions when switching tabs
+            if (tabName === 'apps-tab') {
+                document.querySelector('.logs-section').style.display = 'flex';
+                updateLogs(); // Refresh logs when switching back to the "Apps" tab
+            } else if (tabName === 'models-tab') {
+                // lutzapps - the following event handler functions already fired
+                // in the queryselector eventhandler (esspecially for the "models-tab" tab)
+                //loadModelFolders();
+                //loadCivitaiToken();
+                //loadHFToken(); // lutzapps - added HF_TOKEN Support
+            } else if (tabName === 'settings-tab') {
+                loadSshDetails();
+                updateFileBrowserStatus();
+            }
+        }
+
+        function loadSshDetails() {
+            const ip = '{{ RUNPOD_PUBLIC_IP }}';
+            const port = '{{ RUNPOD_TCP_PORT_22 }}';
+            const sshCommand = `ssh root@${ip} -p ${port}`;
+            document.getElementById('sshIp').textContent = ip;
+            document.getElementById('sshPort').textContent = port;
+            document.getElementById('sshCommand').textContent = sshCommand;
+
+            const newSshPassword = document.getElementById('newSshPassword');
+            const passwordButtons = document.querySelector('.password-buttons');
+            
+            if ('{{ ssh_password_status }}' === 'set') {
+                newSshPassword.placeholder = "Password is set (hidden)";
+                passwordButtons.style.display = 'flex';
             } else {
-                console.error(`Installation failed: ${data.message}`);
-            installButton.disabled = false;  // Re-enable the button only on failure
-        }
-    }
-
-    async function fixCustomNodes(appKey) {
-            const fixButton = document.getElementById('fix-custom-nodes-' + appKey);
-            let logsContainer = document.getElementById('install-logs-' + appKey);
-            
-            // Create logs container if it doesn't exist
-            if (!logsContainer) {
-                logsContainer = document.createElement('div');
-                logsContainer.id = 'install-logs-' + appKey;
-                logsContainer.className = 'install-logs';
-                fixButton.parentNode.insertBefore(logsContainer, fixButton.nextSibling);
+                newSshPassword.placeholder = "Enter new SSH password";
+                passwordButtons.style.display = 'flex';
             }
-            
-            fixButton.disabled = true;
-            logsContainer.style.display = 'block';
-            appendToInstallLogs({app_name: appKey, log: "Starting to fix custom nodes..."});
+        }
 
-            try {
-                const response = await fetch('/fix_custom_nodes/' + appKey, { method: 'POST' });
-                const data = await response.json();
-                if (data.status === 'success') {
-                    appendToInstallLogs({app_name: appKey, log: 'Success: ' + data.message});
-                } else {
-                    throw new Error(data.message);
+        // Add this at the end of your script section
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSshDetails();
+            // ... any other initialization code ...
+        });
+
+        function copySshCommand() {
+                const sshCommand = document.getElementById('sshCommand').textContent;
+                navigator.clipboard.writeText(sshCommand).then(() => {
+                    alert('SSH command copied to clipboard!');
+                }, (err) => {
+                    console.error('Could not copy text: ', err);
+                    alert('Failed to copy SSH command. Please copy it manually.');
+                });
+            }
+
+        function togglePasswordVisibility() {
+                const passwordInput = document.getElementById('newSshPassword');
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    if (passwordInput.placeholder === "Password is set (hidden)") {
+                        passwordInput.value = "{{ ssh_password }}";
+                    }
+                    } else {
+                    passwordInput.type = 'password';
+                    if (passwordInput.value === "{{ ssh_password }}") {
+                        passwordInput.value = '';
+                        passwordInput.placeholder = "Password is set (hidden)";
+                    }
                 }
+            }
+
+        async function setCustomSshPassword() {
+                const newPassword = document.getElementById('newSshPassword').value;
+                if (!newPassword) {
+                    alert('Please enter a password.');
+                    return;
+                }
+                
+                if (confirm('Warning: Password-based SSH authentication is less secure than key-based authentication. Are you sure you want to set a password?')) {
+                    try {
+                        const response = await fetch('/set_ssh_password', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ password: newPassword }),
+                        });
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                            alert('SSH password set successfully.');
+                            document.getElementById('newSshPassword').value = '';
+                            document.getElementById('newSshPassword').placeholder = 'Password is set (hidden)';
+                        } else {
+                            alert('Failed to set SSH password: ' + result.message);
+                        }
+                    } catch (error) {
+                        console.error('Error setting SSH password:', error);
+                        alert('An error occurred while setting the SSH password.');
+                    }
+                }
+            }
+
+        function openFileBrowser() {
+            const podId = '{{ pod_id }}';
+
+            // *** lutzapps - Change #5 - support to run locally
+            // NOTE: ` (back-ticks) are used here for template literals
+            var url = `https://${podId}-7222.proxy.runpod.net/fileapp/`; // need to be declared as var
+            if (`${enable_unsecure_localhost}` === 'True') {
+                url = `http://localhost:7222/fileapp/`; // remove runpod.net proxy
+                //alert(`FileBrowser URL=${url}`);
+            }
+
+            window.open(url, '_blank');
+        }
+
+            async function controlFileBrowser(action) {
+                try {
+                    const response = await fetch(`/${action}_filebrowser`);
+                    const result = await response.json();
+                    if (result.status === 'started' || result.status === 'stopped') {
+                        updateFileBrowserStatus();
+                    }
+                } catch (error) {
+                    console.error('Error controlling File Browser:', error);
+                }
+            }
+
+            function updateFileBrowserStatus() {
+                fetch('/filebrowser_status')
+                    .then(response => response.json())
+                    .then(data => {
+                        const statusElement = document.getElementById('filebrowser-status');
+                        if (statusElement) {
+                            statusElement.textContent = data.status;
+                        }
+                        const startButton = document.getElementById('start-filebrowser');
+                        const stopButton = document.getElementById('stop-filebrowser');
+                        if (startButton && stopButton) {
+                            startButton.disabled = (data.status === 'running');
+                            stopButton.disabled = (data.status === 'stopped');
+                        }
+                    })
+                    .catch(error => console.error('Error updating File Browser status:', error));
+            }
+
+            // Reduce the frequency of status updates
+            setInterval(updateFileBrowserStatus, 30000); // Check every 30 seconds instead of 5 seconds
+
+            // Update the DOMContentLoaded event listener
+            document.addEventListener('DOMContentLoaded', function() {
+                updateFileBrowserStatus();
+                // ... (other initialization code)
+            });
+        // Call this function when the Settings tab is opened
+        document.querySelector('.navbar-tabs a[onclick="openTab(event, \'settings-tab\')"]').addEventListener('click', function() {
+            loadSshDetails();
+            updateFileBrowserStatus();
+        });
+
+        async function installApp(appKey) {
+                const installButton = document.getElementById(`install-${appKey}`);
+                const progressContainer = document.getElementById(`install-progress-${appKey}`);
+                const logsContainer = document.getElementById(`install-logs-${appKey}`);
+
+                installButton.disabled = true;
+                progressContainer.style.display = 'block';
+                logsContainer.style.display = 'block';
+                logsContainer.textContent = '';
+
+                try {
+                    const response = await fetch(`/install/${appKey}`, { method: 'POST' });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const contentType = response.headers.get("content-type");
+                    if (contentType && contentType.indexOf("application/json") !== -1) {
+                        const data = await response.json();
+                        if (data.status !== 'success') {
+                            throw new Error(data.message);
+                        }
+                    } else {
+                        throw new Error("Received non-JSON response from server");
+                    }
+
+                    // Don't reload the page here, wait for the WebSocket 'install_complete' message
+                } catch (error) {
+                    console.error('Installation error:', error);
+                    appendToInstallLogs({app_name: appKey, log: `Error: ${error.message}`});
+                }
+            // Don't re-enable the button here, it will be handled by the WebSocket messages
+        }
+
+        // Update the WebSocket message handler
+        socket.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                console.log("WebSocket message received:", data);
+
+                if (data.type === 'heartbeat') {
+                    // Reset heartbeat timeout on receiving heartbeat response
+                    resetHeartbeatTimeout();
+                } else if (data.type === 'install_progress') {
+                    updateInstallProgress(data.data);
+                } else if (data.type === 'install_log') {
+                    appendToInstallLogs(data.data);
+                } else if (data.type === 'model_download_progress') {
+                    updateModelDownloadProgress(data.data);
+                } else if (data.type === 'status_update') {
+                    updateAppStatus(data.data);
+                // lutzapps - use the extendUIHelper to "bridge" certain extensions between Python and JavaScript
+                } else if (data.type === 'extend_ui_helper') {
+                    extendUIHelper(data.data);
+                }
+                // Handle other message types as needed
             } catch (error) {
-                console.error('Error fixing custom nodes:', error);
-                appendToInstallLogs({app_name: appKey, log: 'Error: ' + error.message});
-            } finally {
-                fixButton.disabled = false;
+                console.error('Error parsing WebSocket message:', error, 'Raw message:', event.data);
+            }
+        };
+
+        function updateInstallProgress(data) {
+                const progressContainer = document.getElementById(`install-progress-${data.app_name}`);
+                const downloadProgress = progressContainer.querySelector('.download-progress');
+                const unpackProgress = progressContainer.querySelector('.unpack-progress');
+                const speedDisplay = progressContainer.querySelector('.download-speed');
+                const etaDisplay = progressContainer.querySelector('.download-eta');
+                const stageDisplay = progressContainer.querySelector('.install-stage');
+                
+                progressContainer.style.display = 'block';
+                
+                if (data.stage === 'Downloading') {
+                    downloadProgress.style.width = `${data.percentage}%`;
+                    downloadProgress.textContent = `${data.percentage.toFixed(2)}%`;
+                    speedDisplay.textContent = `Speed: ${data.speed}`;
+                    etaDisplay.textContent = `ETA: ${formatTime(parseInt(data.eta))}`;
+                } else if (data.stage === 'Unpacking') {
+                    unpackProgress.style.width = `${data.percentage}%`;
+                    unpackProgress.textContent = `${data.percentage.toFixed(2)}%`;
+                    speedDisplay.textContent = `Processed: ${data.processed} / ${data.total} files`;
+                    etaDisplay.textContent = '';
+                } else if (data.stage === 'Download Complete') {
+                    downloadProgress.style.width = '100%';
+                    downloadProgress.textContent = '100%';
+                    speedDisplay.textContent = '';
+                    etaDisplay.textContent = '';
+                }
+                
+            stageDisplay.textContent = `Stage: ${data.stage}`;
+        }
+
+        function formatTime(seconds) {
+                if (seconds < 60) {
+                    return `${seconds} seconds`;
+                } else if (seconds < 3600) {
+                    return `${Math.floor(seconds / 60)} minutes ${seconds % 60} seconds`;
+                } else {
+                    const hours = Math.floor(seconds / 3600);
+                    const minutes = Math.floor((seconds % 3600) / 60);
+                    return `${hours} hours ${minutes} minutes`;
+                }
+            }
+
+            function appendToInstallLogs(data) {
+                const logsContainer = document.getElementById(`install-logs-${data.app_name}`);
+                const logEntry = document.createElement('div');
+                logEntry.textContent = data.log;
+                logsContainer.appendChild(logEntry);
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            }
+
+            function handleInstallComplete(data) {
+                const installButton = document.getElementById(`install-${data.app_name}`);
+                if (data.status === 'success') {
+                    console.log(data.message);
+                    location.reload();  // Reload the page to reflect the new installation status
+                } else {
+                    console.error(`Installation failed: ${data.message}`);
+                installButton.disabled = false;  // Re-enable the button only on failure
             }
         }
-     
+
+        async function fixCustomNodes(appKey) {
+                const fixButton = document.getElementById('fix-custom-nodes-' + appKey);
+                let logsContainer = document.getElementById('install-logs-' + appKey);
+                
+                // Create logs container if it doesn't exist
+                if (!logsContainer) {
+                    logsContainer = document.createElement('div');
+                    logsContainer.id = 'install-logs-' + appKey;
+                    logsContainer.className = 'install-logs';
+                    fixButton.parentNode.insertBefore(logsContainer, fixButton.nextSibling);
+                }
+                
+                fixButton.disabled = true;
+                logsContainer.style.display = 'block';
+                appendToInstallLogs({app_name: appKey, log: "Starting to fix custom nodes..."});
+
+                try {
+                    const response = await fetch('/fix_custom_nodes/' + appKey, { method: 'POST' });
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        appendToInstallLogs({app_name: appKey, log: 'Success: ' + data.message});
+                    } else {
+                        throw new Error(data.message);
+                    }
+                } catch (error) {
+                    console.error('Error fixing custom nodes:', error);
+                    appendToInstallLogs({app_name: appKey, log: 'Error: ' + error.message});
+                } finally {
+                    fixButton.disabled = false;
+                }
+            }
+         
          // Poddy animation
          const secretSequence = [38, 38, 40, 40, 37, 39, 37, 39, 66, 65];
         let sequenceIndex = 0;

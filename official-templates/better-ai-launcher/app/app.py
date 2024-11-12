@@ -121,25 +121,22 @@ def index():
             'status': status,
             'installed': dirs_ok,
             'install_status': install_status,
-            'is_bcomfy': app_name == 'bcomfy'  # Add this line
+            'is_bcomfy': app_name == 'bcomfy'
         }
+
     filebrowser_status = get_filebrowser_status()
     return render_template('index.html', 
-                           apps=app_configs, 
-                           app_status=app_status, 
-                           pod_id=RUNPOD_POD_ID, 
-                           RUNPOD_PUBLIC_IP=os.environ.get('RUNPOD_PUBLIC_IP'),
-                           RUNPOD_TCP_PORT_22=os.environ.get('RUNPOD_TCP_PORT_22'),
-
- # lutzapps - CHANGE #2 - allow localhost Url for unsecure "http" and "ws" WebSockets protocol,
- # according to LOCAL_DEBUG ENV var (used 3x in "index.html" changes)
-                           enable_unsecure_localhost=os.environ.get('LOCAL_DEBUG'),
-
-                           settings=settings,
-                           current_auth_method=current_auth_method,
-                           ssh_password=ssh_password,
-                           ssh_password_status=ssh_password_status,
-                           filebrowser_status=filebrowser_status)
+                         apps=app_configs, 
+                         app_status=app_status, 
+                         pod_id=RUNPOD_POD_ID, 
+                         RUNPOD_PUBLIC_IP=os.environ.get('RUNPOD_PUBLIC_IP'),
+                         RUNPOD_TCP_PORT_22=os.environ.get('RUNPOD_TCP_PORT_22'),
+                         enable_unsecure_localhost=os.environ.get('LOCAL_DEBUG'),
+                         settings=settings,
+                         current_auth_method=current_auth_method,
+                         ssh_password=ssh_password,
+                         ssh_password_status=ssh_password_status,
+                         filebrowser_status=filebrowser_status)
 
 @app.route('/start/<app_name>')
 def start_app(app_name):
@@ -520,35 +517,52 @@ def get_model_types_route():
 
 @app.route('/download_model', methods=['POST'])
 def download_model_route():
-    url = request.json.get('url')
-    model_name = request.json.get('model_name')
-    model_type = request.json.get('model_type')
-    civitai_token = request.json.get('civitai_token') or load_civitai_token()
-    hf_token = request.json.get('hf_token') or load_huggingface_token() # lutzapps - added HF_TOKEN ENV var support
-    version_id = request.json.get('version_id')
-    file_index = request.json.get('file_index')
-
-    is_civitai, _, _, _ = check_civitai_url(url)
-    is_huggingface, _, _, _, _ = check_huggingface_url(url) # TODO: double call
-
-    if not (is_civitai or is_huggingface):
-        return jsonify({'status': 'error', 'message': 'Unsupported URL. Please use Civitai or Hugging Face URLs.'}), 400
-
-    if is_civitai and not civitai_token:
-        return jsonify({'status': 'error', 'message': 'Civitai token is required for downloading from Civitai.'}), 400
-
     try:
-        success, message = download_model(url, model_name, model_type, civitai_token, hf_token, version_id, file_index)
-        if success:
-            if isinstance(message, dict) and 'choice_required' in message:
-                return jsonify({'status': 'choice_required', 'data': message['choice_required']})
-            return jsonify({'status': 'success', 'message': message})
-        else:
-            return jsonify({'status': 'error', 'message': message}), 400
+        data = request.json
+        url = data.get('url')
+        model_name = data.get('model_name')
+        model_type = data.get('model_type')
+        civitai_token = data.get('civitai_token')
+        hf_token = data.get('hf_token')
+        version_id = data.get('version_id')
+        file_index = data.get('file_index')
+
+        # If no token provided in request, try to read from file
+        if not civitai_token:
+            try:
+                if os.path.exists('/workspace/.civitai_token'):
+                    with open('/workspace/.civitai_token', 'r') as f:
+                        token_data = json.load(f)
+                        civitai_token = token_data.get('token')
+            except Exception as e:
+                app.logger.error(f"Error reading token file: {str(e)}")
+
+        is_civitai, _, _, _ = check_civitai_url(url)
+        is_huggingface, _, _, _, _ = check_huggingface_url(url)
+
+        if not (is_civitai or is_huggingface):
+            return jsonify({'status': 'error', 'message': 'Unsupported URL. Please use Civitai or Hugging Face URLs.'}), 400
+
+        if is_civitai and not civitai_token:
+            return jsonify({'status': 'error', 'message': 'Civitai token is required for downloading from Civitai.'}), 400
+
+        try:
+            success, message = download_model(url, model_name, model_type, civitai_token, hf_token, version_id, file_index)
+            if success:
+                if isinstance(message, dict) and 'choice_required' in message:
+                    return jsonify({'status': 'choice_required', 'data': message['choice_required']})
+                return jsonify({'status': 'success', 'message': message})
+            else:
+                return jsonify({'status': 'error', 'message': message}), 400
+        except Exception as e:
+            error_message = f"Model download error: {str(e)}\n{traceback.format_exc()}"
+            app.logger.error(error_message)
+            return jsonify({'status': 'error', 'message': error_message}), 500
+
     except Exception as e:
-        error_message = f"Model download error: {str(e)}\n{traceback.format_exc()}"
+        error_message = f"Error processing request: {str(e)}\n{traceback.format_exc()}"
         app.logger.error(error_message)
-        return jsonify({'status': 'error', 'message': error_message}), 500
+        return jsonify({'status': 'error', 'message': error_message}), 400
 
 @app.route('/get_model_folders')
 def get_model_folders():

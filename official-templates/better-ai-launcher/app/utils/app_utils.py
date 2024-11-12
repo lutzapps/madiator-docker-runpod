@@ -14,7 +14,7 @@ import time
 import datetime
 import shutil
 from utils.app_configs import (app_configs, DEBUG_SETTINGS, pretty_dict, init_app_configs, init_debug_settings, write_debug_setting, ensure_kohya_local_venv_is_symlinked)
-from utils.model_utils import (get_sha256_hash_from_file)
+from utils.model_utils import (get_sha256_hash_from_file, download_civitai_model)
 
 INSTALL_STATUS_FILE = '/tmp/install_status.json'
 
@@ -701,6 +701,11 @@ def download_and_unpack_venv_v2(app_name:str, app_configs:dict, send_websocket_m
         send_websocket_message('install_progress', {'app_name': app_name, 'percentage': 100, 'stage': 'Unpacking Complete'})
         send_websocket_message('install_log', {'app_name': app_name, 'log': 'Unpacking complete. Proceeding to clone repository...'})
 
+        # Get the app config from app_configs
+        app_config = app_configs.get(app_name)
+        if not app_config:
+            return False, f"App '{app_name}' not found in configurations."
+
         # Clone the repository
         success, message = clone_application(app_config, send_websocket_message)
         if not success:
@@ -1074,3 +1079,71 @@ def install_app(app_name:str, app_configs:dict, send_websocket_message) -> tuple
         return success, message
     else:
         return False, f"Unknown app: {app_name}"
+
+def download_civitai_model(url, model_name, model_type, civitai_token=None, version_id=None, file_index=None):
+    try:
+        model_id = extract_model_id(url)
+        if not model_id:
+            raise ValueError("Could not extract model ID from URL")
+
+        # Use provided token or try to read from file
+        if not civitai_token:
+            try:
+                if os.path.exists('/workspace/.civitai_token'):
+                    with open('/workspace/.civitai_token', 'r') as f:
+                        token_data = json.load(f)
+                        civitai_token = token_data.get('token')
+            except Exception as e:
+                print(f"Error reading token file: {str(e)}")
+
+        headers = {"Authorization": f"Bearer {civitai_token}"} if civitai_token else {}
+        
+        # Get model info
+        model_info_url = f"https://civitai.com/api/v1/models/{model_id}"
+        response = requests.get(model_info_url, headers=headers)
+        if response.status_code != 200:
+            raise Exception(f"Failed to get model info: {response.text}")
+        
+        model_info = response.json()
+        versions = model_info.get('modelVersions', [])
+        
+        if not versions:
+            raise Exception("No versions found for this model")
+
+        # Handle version selection - return early if selection needed
+        if version_id is None and len(versions) > 1:
+            return {
+                'type': 'version',
+                'versions': versions,
+                'civitai_token': civitai_token
+            }
+        
+        # Get the selected version
+        selected_version = versions[0] if version_id is None else next(
+            (v for v in versions if str(v['id']) == str(version_id)), None)
+        
+        if not selected_version:
+            raise Exception("Specified version not found")
+
+        # Handle file selection - return early if selection needed
+        files = selected_version.get('files', [])
+        if not files:
+            raise Exception("No files found for this version")
+
+        if file_index is None and len(files) > 1:
+            return {
+                'type': 'file',
+                'files': files,
+                'version_id': selected_version['id'],
+                'civitai_token': civitai_token
+            }
+
+        # Select the file
+        selected_file = files[file_index if file_index is not None else 0]
+        if not selected_file:
+            raise Exception("No file found")
+
+        return selected_file
+
+    except Exception as e:
+        raise Exception(f"Exception downloading from CivitAI: {str(e)}")
