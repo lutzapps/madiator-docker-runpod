@@ -34,7 +34,7 @@ app_configs = {
         'repo_url': 'https://github.com/comfyanonymous/ComfyUI.git',
         'branch_name': '', # empty branch_name means default = 'master'
         'commit': '', # or commit hash (NYI)
-        'recursive': False,
+        'clone_recursive': False,
         'refresh': False,
         'custom_nodes': [ # following custom_nodes will be git cloned and installed with "pip install -r requirements.txt" (in Testing)
             {
