@@ -3498,7 +3498,7 @@
                 //loadHFToken(); // lutzapps - added HF_TOKEN Support
             } else if (tabName === 'settings-tab') {
                 loadSshDetails();
-                updateFileBrowserStatus();
+                // Remove updateFileBrowserStatus() from here
             }
         }
 
@@ -3604,43 +3604,26 @@
                     const response = await fetch(`/${action}_filebrowser`);
                     const result = await response.json();
                     if (result.status === 'started' || result.status === 'stopped') {
-                        updateFileBrowserStatus();
+                        // Remove updateFileBrowserStatus() from here
                     }
                 } catch (error) {
                     console.error('Error controlling File Browser:', error);
                 }
             }
 
-            function updateFileBrowserStatus() {
-                fetch('/filebrowser_status')
-                    .then(response => response.json())
-                    .then(data => {
-                        const statusElement = document.getElementById('filebrowser-status');
-                        if (statusElement) {
-                            statusElement.textContent = data.status;
-                        }
-                        const startButton = document.getElementById('start-filebrowser');
-                        const stopButton = document.getElementById('stop-filebrowser');
-                        if (startButton && stopButton) {
-                            startButton.disabled = (data.status === 'running');
-                            stopButton.disabled = (data.status === 'stopped');
-                        }
-                    })
-                    .catch(error => console.error('Error updating File Browser status:', error));
-            }
-
             // Reduce the frequency of status updates
-            setInterval(updateFileBrowserStatus, 30000); // Check every 30 seconds instead of 5 seconds
+            // Remove this interval
+            // setInterval(updateFileBrowserStatus, 30000); // Check every 30 seconds instead of 5 seconds
 
             // Update the DOMContentLoaded event listener
             document.addEventListener('DOMContentLoaded', function() {
-                updateFileBrowserStatus();
+                loadSshDetails();
                 // ... (other initialization code)
             });
-        // Call this function when the Settings tab is opened
+        // Update the Settings tab click handler
         document.querySelector('.navbar-tabs a[onclick="openTab(event, \'settings-tab\')"]').addEventListener('click', function() {
             loadSshDetails();
-            updateFileBrowserStatus();
+            // Remove updateFileBrowserStatus() from here
         });
 
         async function installApp(appKey) {
