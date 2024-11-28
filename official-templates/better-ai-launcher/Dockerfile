@@ -156,13 +156,13 @@ COPY app/tests/README-SHARED_MODELS.txt /app/static/README-SHARED_MODELS.txt
 
 
 # Copy all necessary scripts
-#COPY --from=scripts start.sh /
+COPY --from=scripts start.sh /
 # --from=scripts is defined as a "shared" location in "docker-bake.hcl" in the "contexts" dict:
 #   scripts = "../../container-template"
 # the local "start.sh" is (intentionally) empty
 # to build all from *one* location, copy "start.sh" here into the project workspace folder first
 # cp ../../container-template/scripts/start.sh start.sh
-COPY start.sh /
+#COPY start.sh /
 
 COPY pre_start.sh /
 # lutzapps - add execution flags to added "/app/tests/populate_testdata.sh"
