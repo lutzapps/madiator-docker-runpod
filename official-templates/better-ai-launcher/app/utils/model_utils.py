@@ -33,7 +33,53 @@ def ensure_shared_folder_exists():
     #    os.makedirs(os.path.join(SHARED_MODELS_DIR, folder), exist_ok=True)
     ensure_shared_models_folders()
 
-def check_civitai_url(url):
+def check_civitai_url(url:str) -> tuple[bool, bool, str, str]:
+    # https://education.civitai.com/civitais-guide-to-downloading-via-api/
+
+    civitai_domain = "civitai.com"
+
+    try:
+        url = url.lower() # convert to lcase
+
+        ### sample url for normal civitai_url
+        # url = "https://civitai.com/models/618692?modelVersionId=691639"
+        url_pattern_models = r"https://civitai\.com/models/(\d+)(?:\?modelversionid=(\d+))?"
+
+        ### sample url for civitai_api_url
+        # api_url = "https://civitai.com/api/download/models/12345?type=Model&format=SafeTensor&size=pruned&fp=fp16&token=YOUR_TOKEN_HERE"
+        url_pattern_api_models = r"https://civitai\.com/api/download/models/(\d+)"
+
+        is_civitai = (civitai_domain in url) # any civitai url
+        is_civitai_api = (is_civitai and ("/api/" in url)) # only civitai_api_url
+        # refine the is_civitai to be only true, if NOT already a civit_api_url
+        is_civitai = (is_civitai and not is_civitai_api)
+
+        model_id = None
+        version_id = None
+
+        if not is_civitai:
+            return is_civitai, is_civitai_api, model_id, version_id # False, False, None, None
+
+        if is_civitai_api:
+            match = re.match(url_pattern_api_models, url)
+            if match:
+                model_id = match.group(1)  # e.g., "619777"
+                return is_civitai, is_civitai_api, model_id, version_id # False, True, model_id, None
+
+        # only case left (is_civitai == True)
+        match = re.match(url_pattern_models, url)
+        if match:
+            model_id = match.group(1) # e.g., "618692"
+            version_id = match.group(2) # e.g., "691639" or None if not present
+            return is_civitai, is_civitai_api, model_id, version_id # True, False, model_id, version_id
+
+    except Exception as e:
+        print(f"ERROR in Url parsing for CivitAI url: {url}: {str(e)}")
+
+    return False, False, None, None
+
+# old version - disabled
+def check_civitai_url_v0(url):
     prefix = "civitai.com"
     try:
         if prefix in url:
@@ -54,7 +100,42 @@ def check_civitai_url(url):
         print("Error parsing Civitai model URL")
     return False, False, None, None
 
-def check_huggingface_url(url):
+
+def check_huggingface_url(url:str) -> tuple[bool, str, str, str, str]:
+    huggingface_domain = "huggingface.co" # matches both ".com" and ".co"
+
+    try:
+        url = url.lower() # convert to lcase
+
+        ### sample url for normal huggingface_url
+        # url1 = "https://huggingface.com/stabilityai/sd-vae-ft-mse-original/blob/main/vae-ft-mse-840000-ema-pruned.safetensors"
+        # url = "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/subfolder1/subfolder2/vae-ft-mse-840000-ema-pruned.safetensors"
+        url_pattern = r"https://huggingface\.(?:co|com)/([\w.-]+/[\w.-]+)/(resolve|blob)/(main|tree)(?:/([\w./-]+))?/([\w.-]+)$"
+
+        is_huggingface = (huggingface_domain in url)
+
+        repo_id = None
+        filename = None
+        folder_name = None
+        branch_name = None
+
+        match = re.match(url_pattern, url)
+        if match:
+            repo_id = match.group(1)        # e.g., "stabilityai/sd-vae-ft-mse-original"
+            folder_name = match.group(2)    # e.g., "resolve" or "blob" (normally only the "resolve" folder is the download link of the model)
+            branch_name = match.group(3)    # e.g., "main" or "tree"
+            folders = match.group(4)        # e.g., "subfolder1/subfolder2" or None if not present
+            filename = match.group(5)       # e.g., "vae-ft-mse-840000-ema-pruned.safetensors"
+
+    except Exception as e:
+        error_msg = f"ERROR in Url parsing for HuggingFace url: {url}: {str(e)}"
+        print(error_msg)
+
+    return is_huggingface, repo_id, filename, folder_name, branch_name
+
+
+# old version - disabled
+def check_huggingface_url_v0(url):
     parsed_url = urlparse(url)
     if parsed_url.netloc not in ["huggingface.co", "huggingface.com"]:
         return False, None, None, None, None
@@ -74,7 +155,7 @@ def check_huggingface_url(url):
 def download_model(url, model_name, model_type, civitai_token=None, hf_token=None, version_id=None, file_index=None) -> tuple[bool, str]:
     ensure_shared_folder_exists()
     is_civitai, is_civitai_api, model_id, _ = check_civitai_url(url)
-    is_huggingface, repo_id, hf_filename, hf_folder_name, hf_branch_name = check_huggingface_url(url) # TODO: double call
+    is_huggingface, repo_id, hf_filename, hf_folder_name, hf_branch_name = check_huggingface_url(url) # TODO: double calls (need to)
 
     if is_civitai or is_civitai_api:
         if not civitai_token:
@@ -97,42 +178,80 @@ def download_model(url, model_name, model_type, civitai_token=None, hf_token=Non
 # lutzapps - added SHA256 checks for already existing ident and downloaded HuggingFace model
 def download_civitai_model(url, model_name, model_type, civitai_token, version_id=None, file_index=None) -> tuple[bool, str]:
     try:
+
+        # Error: Exception downloading from CivitAI:
+        # cannot access local variable 'civitai_file' where it is not associated with a value
+        #
+        # example of model Flux Dev Model: https://civitai.com/models/618692?modelVersionId=691639
+
+        # examine the url, and extract model_id and url_version_id
         is_civitai, is_civitai_api, model_id, url_version_id = check_civitai_url(url)
-        
-        headers = {'Authorization': f'Bearer {civitai_token}'}
+        from app import (load_civitai_token)
+        # use provided token or try to read the token from ENV var or stored file
+        if not civitai_token:
+            civitai_token = load_civitai_token()
+
+        # use the civitai token for Authorization
+        headers = {"Authorization": f"Bearer {civitai_token}"} if civitai_token else {}
         
         if is_civitai_api:
             api_url = f"https://civitai.com/api/v1/model-versions/{url_version_id}"
         else:
             api_url = f"https://civitai.com/api/v1/models/{model_id}"
         
+        # get the model data from the civitai repository
         response = requests.get(api_url, headers=headers)
-        response.raise_for_status()
-        model_data = response.json()
+        #response.raise_for_status()
+        if response.status_code != 200:
+            raise Exception(f"Failed to get model info: {response.text}")
         
+        model_data = response.json()
+
+        civitai_model_type = model_data['type']
+        # map the civitai model type to our internal SHARED_MODEL_FOLDERS model_type
+        model_type = MODEL_TYPE_MAPPING.get(civitai_model_type, 'Stable-diffusion') # default is 'ckpt'
+
         if is_civitai_api:
             version_data = model_data
             model_data = version_data['model']
         else:
-            if version_id:
-                version_data = next((v for v in model_data['modelVersions'] if v['id'] == version_id), None)
-            elif url_version_id:
-                version_data = next((v for v in model_data['modelVersions'] if v['id'] == url_version_id), None)
-            else:
-                version_data = model_data['modelVersions'][0]
+
+            versions = model_data.get('modelVersions', [])
+
+            if not version_id:
+                version_id = url_version_id
+
+            if version_id == None: # no version_id specified, let the user pick from available versions
+
+                return True, {
+                    'choice_required': {
+                        'type': 'version',
+                        'model_id': model_id,
+                        'versions': versions
+                    }
+                }
+
+            # Get the selected version
+            version_data = next(
+                (v for v in versions if str(v['id']) == str(version_id)), None)
+    
+            # if version_id:
+            #     version_data = next((v for v in versions if v['id'] == version_id), None)
+            # elif url_version_id:
+            #     version_data = next((v for v in versions if v['id'] == url_version_id), None)
+            # else:
+            #     version_data = versions[0]
             
             if not version_data:
                 return False, f"Version ID {version_id or url_version_id} not found for this model."
-        
-        civitai_model_type = model_data['type']
-        model_type = MODEL_TYPE_MAPPING.get(civitai_model_type, 'Stable-diffusion')
-        
+                
         files = version_data['files']
         if file_index is not None and 0 <= file_index < len(files):
-            file_to_download = files[file_index]
+            civitai_file = files[file_index]
         elif len(files) > 1:
             # If there are multiple files and no specific file was chosen, ask the user to choose
-            file_options = [{'name': f['name'], 'size': f['sizeKB'], 'type': f['type']} for f in files]
+            # extended for more info needed - 'metadata': {'format': 'SafeTensor', 'size': 'full', 'fp': 'fp32'},
+            file_options = [{'name': f['name'], 'sizeKB': f['sizeKB'], 'type': f['type'], 'format': f['metadata']['format'], 'size': f['metadata']['size'], 'fp': f['metadata']['fp']} for f in files]
             return True, {
                 'choice_required': {
                     'type': 'file',
