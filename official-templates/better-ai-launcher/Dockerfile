@@ -20,7 +20,7 @@ RUN apt-get update && \
     ### ---> needed Tools for Installer
     # removed: 2x git nginx ffmpeg (as they are already installed with the base image)
     # added: pigz (for parallel execution of TAR files); zip (for easier folder compression)
-    apt-get install -y aria2 pigz zip pv rsync zstd libtcmalloc-minimal4 bc \
+    apt-get install -y aria2 pigz zip pv rsync zstd tree libtcmalloc-minimal4 bc \
     # add Python3.11 as system Python version, serving the Python Flask App
     python3.11 python3.11-venv python3.11-dev python3.11-distutils && \
     # not remove Python3.10, as we need it for "official" app support (e.g. for kohya_ss VENV)
@@ -85,6 +85,9 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3.11 get-pip.py && \
     rm get-pip.py
 
+# set the default python_cmd (and version) for the apps 'ba1111' and 'bforge' default launch script 'webui.sh'
+ENV python_cmd=python3.11
+
 # Set the working directory
 WORKDIR /app
 
@@ -102,15 +105,33 @@ COPY app .
 RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash
 
 # Set environment variables for developent/production
-# overwrite this ENV in "tasks.json" docker run "env" section or overwrite in your ".env" file to "development"
+# ENV vars alternatively could also stay in two different Dockerfiles: 'Dockerfile-Prod' and 'Dockerfile-Dev')
+
+### PROD START:
+#
+# ENV APP_CONFIGS_MANIFEST_URL=https://better.s3.madiator.com/app_configs.json
+#
+# overwrite this ENV in "tasks.json" docker run "env" section, docker-compose-debug.yml, or overwrite in your ".env" file to "development"
 ENV FLASK_ENV=production
+#
+### PROD END
 
+### DEV START:
+#
+ENV APP_CONFIGS_MANIFEST_URL=https://better-dev.s3.madiator.com/app_configs.json
+#
+# alternativly add the following ENV vars in "tasks.json" docker run "env" section, docker-compose-debug.yml,
+# or populate them in in your ".env" file, instead of setting them here in the Dockerfile
+#
 # gevent monkey-patching is being used, enable gevent support in the debugger with GEVENT_SUPPORT=True
-# add this ENV in "tasks.json" docker run "env" section or populate in your ".env" file
 # ENV GEVENT_SUPPORT=True
+#
+# keep Python from generating .pyc files in the container
+# this should however be removed for production as it disables bytecode caching
+# ENV PYTHONDONTWRITEBYTECODE=1
+#
+### DEV END
 
-# lutzapps - keep Python from generating .pyc files in the container
-ENV PYTHONDONTWRITEBYTECODE=1
 
 # Turns off buffering for easier container logging
 ENV PYTHONUNBUFFERED=1
@@ -128,14 +149,20 @@ EXPOSE 7222
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
 COPY nginx/readme.html /usr/share/nginx/html/readme.html
 
+# HELP configuration ('/static/' is configured be hosting '/app/static/' content in nginx.conf)
+COPY README.md /app/static/README.md
+COPY README-Development.txt /app/static/README-Development.txt
+COPY app/tests/README-SHARED_MODELS.txt /app/static/README-SHARED_MODELS.txt
+
+
 # Copy all necessary scripts
-COPY --from=scripts start.sh /
+#COPY --from=scripts start.sh /
 # --from=scripts is defined as a "shared" location in "docker-bake.hcl" in the "contexts" dict:
 #   scripts = "../../container-template"
 # the local "start.sh" is (intentionally) empty
 # to build all from *one* location, copy "start.sh" here into the project workspace folder first
 # cp ../../container-template/scripts/start.sh start.sh
-#COPY start.sh /
+COPY start.sh /
 
 COPY pre_start.sh /
 # lutzapps - add execution flags to added "/app/tests/populate_testdata.sh"

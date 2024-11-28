@@ -423,6 +423,9 @@
         }
 
         .button-group button,
+        .check-installation-app-button,
+        .refresh-installation-app-button,
+        .delete-installation-app-button,
         .fix-custom-nodes-button {
             border: none;
             color: white;
@@ -440,11 +443,18 @@
             margin-top: 10px;
         }
 
+        .check-installation-app-button,
+        .refresh-installation-app-button,
+        .delete-installation-app-button,
         .fix-custom-nodes-button {
-            width: 100%;  /* Keep fix custom nodes button full width */
+            background-color: #616261; /* darker background-color for Chrome */
+            width: 100%;  /* make the buttons full width */
             margin-top: 10px;
         }
 
+        .check-installation-app-button:hover,
+        .refresh-installation-app-button:hover,
+        .delete-installation-app-button:hover,
         .fix-custom-nodes-button:hover {
             background-color: #7B1FA2;
             transform: translateY(-2px);
@@ -563,6 +573,8 @@
         }
 
         .button-group button,
+        .check-installation-app-button,
+        .refresh-installation-app-button,
         .fix-custom-nodes-button,
         .install-button {
             border: none;
@@ -2415,10 +2427,19 @@
                                         <i class="fas fa-list-alt"></i> View Logs
                                     </button>
                                     <button onclick="openApp('{{ app_key }}', {{ app_status[app_key]['port'] }})" id="open-{{ app_key }}" class="open-button" {% if app_status[app_key]['status'] == 'stopped' %}disabled{% endif %}>
-                                        <i class="fas fa-external-link-alt"></i> Open App
+                                        <i class="fas fa-external-link-alt"></i> Open Application
                                     </button>
                                     <button onclick="forceKillApp('{{ app_key }}')" id="force-kill-{{ app_key }}" class="force-kill-button">
                                         <i class="fas fa-times-circle"></i> Force Kill
+                                    </button>
+                                    <button onclick="checkAppInstallation('{{ app_key }}')" id="check-installation-{{ app_key }}" class="check-installation-app-button">
+                                        <i class="fas fa-wrench"></i> Check Application
+                                    </button>
+                                    <button onclick="refreshAppInstallation('{{ app_key }}')" id="refresh-installation-{{ app_key }}" class="refresh-installation-app-button">
+                                        <i class="fas fa-wrench"></i> Refresh Application
+                                    </button>
+                                    <button onclick="deleteAppInstallation('{{ app_key }}', '')" id="delete-installation-{{ app_key }}" class="delete-installation-app-button">
+                                        <i class="fas fa-wrench"></i> Delete Application
                                     </button>
                                 </div>
                                 {% if app_key == 'bcomfy' %}
@@ -2429,7 +2450,7 @@
                                 <div class="status">Status: {{ app_status[app_key]['status'] }}</div>
                                 {% else %}
                                 <div class="install-container">
-                                    <button onclick="installApp('{{ app_key }}')" id="install-{{ app_key }}" class="install-button">
+                                    <button onclick="installApp('{{ app_key }}', '')" id="install-{{ app_key }}" class="install-button">
                                         <i class="fas fa-download"></i> Install
                                     </button>
                                     <div id="install-progress-{{ app_key }}" class="install-progress" style="display: none;">
@@ -2443,6 +2464,12 @@
                                             <div class="progress-label">Unpack Progress:</div>
                                             <div class="progress-bar">
                                                 <div class="progress-bar-fill unpack-progress" style="width: 0%">0%</div>
+                                            </div>
+                                        </div>
+                                        <div class="progress-container">
+                                            <div class="progress-label">Install/Refresh Progress:</div>
+                                            <div class="progress-bar">
+                                                <div class="progress-bar-fill clone-progress" style="width: 0%">0%</div>
                                             </div>
                                         </div>
                                         <div class="download-info">
@@ -2473,6 +2500,16 @@
                 <div class="settings-container">
                     <div class="settings-grid">
                         <div class="setting-group">
+                            <h3>About</h3>
+                            <div>
+                                Version: dev-beta-v0.9.0<br><br>
+                                <span>Manifest Url:<a class="example-link" href="{{ app_configs_manifest_url }}" target="_blank" rel="noopener noreferrer">{{ app_configs_manifest_url }}</a></span><br>
+                                <a class="example-link" href="/static/README.md" target="_blank" rel="noopener noreferrer">README</a><br>
+                                <a class="example-link" href="/static/README-Development.txt" target="_blank" rel="noopener noreferrer">README Development</a><br>
+                                <a class="example-link" href="/static/README-SHARED_MODELS.txt" target="_blank" rel="noopener noreferrer">README SHARED_MODELS</a>
+                            </div>
+                        </div>
+                        <div class="setting-group">
                             <h3>SSH Configuration</h3>
                             <div class="ssh-details">
                                 <p>IP: <span id="sshIp"></span></p>
@@ -2499,7 +2536,7 @@
                                 <strong>Username:</strong> admin<br>
                                 <strong>Password:</strong> admin
                             </p>
-                            <p>Status: <span id="filebrowser-status">Checking...</span></p>
+                            <p>Status: <span id="filebrowser-status"></span></p>
                             <button id="start-filebrowser" onclick="controlFileBrowser('start')" class="settings-button">Start File Browser</button>
                             <button id="stop-filebrowser" onclick="controlFileBrowser('stop')" class="settings-button">Stop File Browser</button>
                         </div>
@@ -2523,12 +2560,8 @@
                             <h3>Model Downloader</h3>
                             <div class="model-downloader">
                                 <input type="text" id="modelUrl" placeholder="Enter Civitai or Hugging Face URL">
-                                <input type="text" id="modelName" placeholder="Enter model name (optional)">
-                                <select id="modelType"><!-- lutzapps - Change #1 - remove default modelType select option values -->
-                                    <!-- <option value="Stable-diffusion">Checkpoint (Stable Diffusion)</option> -->
-                                    <!-- <option value="Lora">LoRA</option> -->
-                                    <!-- <option value="VAE">VAE</option> -->
-                                    <!-- <option value="ESRGAN">Upscaler</option> -->
+                                <input type="text" id="modelName" placeholder="Enter model name (renames model filename)">
+                                <select id="modelType">
                                 </select>
                                 <input type="password" id="civitaiToken" placeholder="Civitai API Token">
                                 <input type="password" id="hfToken" placeholder="Hugging Face API Token (optional)">
@@ -2604,7 +2637,7 @@
     </div>
 
     <div class="copyright">
-        &copy; 2024 RunPod Better App Manager. Created by Madiator2011.
+        &copy; 2024 RunPod Better App Manager. Created by Madiator2011 & lutzapps.
     </div>
 
     <div id="poddy"></div>
@@ -2624,8 +2657,8 @@
         const app_configs = {
             {% for app_key, app_info in apps.items() %}
                 "{{ app_key }}": {
-                    "name": "{{ app_info.name }}",
-                    "port": {{ app_info.port }}
+                        "name": "{{ app_info.name }}",
+                        "port": {{ app_info.port }}
                 },
             {% endfor %}
         };
@@ -2633,1054 +2666,71 @@
 
     <!-- Rest of your JavaScript code -->
     <script>
-        const appStatuses = {};
-        let currentLogApp = null;
-        let currentLogAppName = null;
-        const podId = '{{ pod_id }}';
-        const WS_PORT = 7222;  // This is the Nginx port
-
-        // lutzapps - remember the last know MODELTYPE_SELECTED of the WebUI Dom Id 'modelType' "select dropdown" model list
-        // so the selection can be restored between "Tab Switches", and during refreshes/reloads of the modelType list
-        // this is handled by the extendUIHelper() function, which is called directly from JavaScript events,
-        // but is also called indirectly from Python code via WS message type='extend_ui_helper'
-        // e.g. from the model_utils:download_civitai_model() function, to preserve "state" of the selected modelType
-
-        let MODELTYPE_SELECTED = "";
-        modelType.onchange = function() {
-            MODELTYPE_SELECTED = this.value;
-            alert("onchange=" + MODELTYPE_SELECTED);
-        }
-
-        // *** lutzapps - Change #2 - support to run locally at http://localhost:${WS_PORT} (3 locations in "index.html")
-        const enable_unsecure_localhost = '{{ enable_unsecure_localhost }}';
-
-        // default is to use the "production" WeckSockets CloudFlare URL
-        // NOTE: ` (back-ticks) are used here for template literals
-        var WS_URL = `wss://${podId}-${WS_PORT}.proxy.runpod.net/ws`; // need to be declared as var
-
-        if (`${enable_unsecure_localhost}` === 'True') { // value of LOCAL_DEBUG ENV var
-            // make sure to use "ws" Protocol (insecure) instead of "wss" (WebSockets Secure) for localhost,
-            // otherwise you will get the 'loadingOverlay' stay and stays on screen with ERROR:
-            // "WebSocket disconnected. Attempting to reconnect..." blocking the webpage http://localhost:7222
-            WS_URL = `ws://localhost:${WS_PORT}/ws`; // localhost WS (unsecured)
-            //alert(`Running locally with WS_URL=${WS_URL}`);
-        }
-
-
-        let socket;
-        let reconnectAttempts = 0;
-        const maxReconnectAttempts = 5;
-        const reconnectInterval = 5000; // 5 seconds
-
-        function connectWebSocket() {
-            console.log("Attempting to connect to WebSocket...");
-            document.getElementById('loadingMessage').textContent = 'Connecting to WebSocket...';
-
-            socket = new WebSocket(WS_URL);
-
-            socket.onopen = function(e) {
-                console.log("Connected to WebSocket");
-                document.getElementById('loadingOverlay').style.display = 'none';
-                reconnectAttempts = 0;
-                initializeUI();
-                // Start sending heartbeats immediately after connection
-                startHeartbeat();
-            };
-
-            socket.onmessage = function(event) {
-                try {
-                    const data = JSON.parse(event.data);
-                    console.log(`Data received from server:`, data);
-                    
-                    if (data.type === 'heartbeat') {
-                        // Reset heartbeat timeout on receiving heartbeat response
-                        resetHeartbeatTimeout();
-                    } else if (data.type === 'model_download_progress') {
-                        updateModelDownloadProgress(data.data);
-                    } else if (data.type === 'status_update') {
-                        updateAppStatus(data.data);
-                    }
-                    // Handle other message types as needed
-                } catch (error) {
-                    console.error('Error parsing WebSocket message:', error, 'Raw message:', event.data);
-                }
-            };
-
-            socket.onclose = function(event) {
-                if (event.wasClean) {
-                    console.log(`Connection closed cleanly, code=${event.code} reason=${event.reason}`);
-                } else {
-                    console.log('Connection died');
-                }
-                handleReconnect();
-            };
-
-            socket.onerror = function(error) {
-                console.log(`WebSocket Error: ${error.message}`);
-                handleReconnect();
-            };
-        }
-
-        let heartbeatInterval;
-        let heartbeatTimeout;
-
-        function startHeartbeat() {
-            // Clear any existing intervals
-            if (heartbeatInterval) {
-                clearInterval(heartbeatInterval);
-            }
-            
-            // Send heartbeat every 60 seconds
-            heartbeatInterval = setInterval(() => {
-                if (socket.readyState === WebSocket.OPEN) {
-                    socket.send(JSON.stringify({ type: 'heartbeat' }));
-                    // Set timeout to reconnect if no response within 10 seconds
-                    setHeartbeatTimeout();
-                }
-            }, 60000);
-        }
-
-        function setHeartbeatTimeout() {
-            if (heartbeatTimeout) {
-                clearTimeout(heartbeatTimeout);
-            }
-            heartbeatTimeout = setTimeout(() => {
-                console.log("Heartbeat timeout - attempting reconnect...");
-                if (socket) {
-                    socket.close();
-                }
-                handleReconnect();
-            }, 65000); // Increased timeout to 65 seconds
-        }
-
-        function resetHeartbeatTimeout() {
-            if (heartbeatTimeout) {
-                clearTimeout(heartbeatTimeout);
-            }
-        }
-
-        // Clean up on page unload
-        window.addEventListener('beforeunload', () => {
-            if (heartbeatInterval) {
-                clearInterval(heartbeatInterval);
-            }
-            if (heartbeatTimeout) {
-                clearTimeout(heartbeatTimeout);
-            }
-            if (socket) {
-                socket.close();
-            }
-        });
-
-        function handleReconnect() {
-            if (reconnectAttempts < maxReconnectAttempts) {
-                reconnectAttempts++;
-                document.getElementById('loadingOverlay').style.display = 'flex';
-                document.getElementById('loadingMessage').textContent = 
-                    `WebSocket disconnected. Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`;
-                
-                // Add exponential backoff
-                const backoffTime = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-                setTimeout(connectWebSocket, backoffTime);
-            } else {
-                document.getElementById('loadingMessage').textContent = 
-                    'Failed to connect to WebSocket. Installation continues in background. Please refresh page to see status.';
-            }
-        }
-
-        function sendWebSocketMessage(type, data) {
-            if (socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ type, data }));
-            }
-        }
-
-        let lastUpdateTime = 0;
-        const updateInterval = 250; // Update every 250ms
-
-        function updateModelDownloadProgress(data) {
-            const currentTime = Date.now();
-            if (currentTime - lastUpdateTime < updateInterval) {
-                return; // Skip update if it's too soon
-            }
-            lastUpdateTime = currentTime;
-
-            const progressBar = document.querySelector('#model-download-progress .progress-bar-fill');
-            const statusDiv = document.getElementById('model-download-status');
-            const speedDiv = document.getElementById('model-download-speed');
-            const etaDiv = document.getElementById('model-download-eta');
-            
-            if (data.percentage !== undefined) {
-                progressBar.style.width = `${data.percentage}%`;
-                progressBar.textContent = `${data.percentage.toFixed(2)}%`;
-            }
-            
-            statusDiv.textContent = data.message || '';
-            
-            if (data.speed) {
-                speedDiv.textContent = `Speed: ${data.speed}`;
-            } else {
-                speedDiv.textContent = 'Speed: N/A';
-            }
-            
-            if (data.eta) {
-                etaDiv.textContent = `ETA: ${formatTime(data.eta)}`;
-            } else {
-                etaDiv.textContent = 'ETA: Calculating...';
-            }
-            
-            if (data.stage === 'Complete') {
-                // lutzapps - clear 'Speed: N/A' and 'ETA: Calculating...' Div textContent, when no eta/speed data, but 'Complete'
-                etaDiv.textContent = '';
-                speedDiv.textContent = '';
-                loadModelFolders(); // Refresh the Existing Models section when download is complete
-            }
-        }
-
-        function updateAppStatus(appKey, status) {
-            appStatuses[appKey] = status;
-            const statusElement = document.getElementById(`status-${appKey}`);
-            if (statusElement) {
-                statusElement.textContent = status.charAt(0).toUpperCase() + status.slice(1);
-                statusElement.className = `status status-${status}`;
-                document.getElementById(`start-${appKey}`).disabled = (status === 'running');
-                document.getElementById(`stop-${appKey}`).disabled = (status === 'stopped');
-                document.getElementById(`open-${appKey}`).disabled = (status === 'stopped');
-            }
-        }
-
-        async function startApp(appKey) {
-            try {
-                const response = await fetch(`/start/${appKey}`);
-                const data = await response.json();
-                if (data.status === 'started' || data.status === 'already_running') {
-                    updateAppStatus({ [appKey]: 'running' });
-                    // Get the app name from app_configs and show logs
-                    const appName = app_configs[appKey].name;
-                    // Switch to logs view
-                    currentLogApp = appKey;
-                    currentLogAppName = appName;
-                    document.getElementById('currentAppName').textContent = `Logs - ${appName}`;
-                    document.getElementById('downloadLogsBtn').style.display = 'flex';
-                    document.getElementById('logs').textContent = ''; // Clear existing logs
-                    updateLogs(); // Start updating logs
-                    
-                    // Make sure logs section is visible
-                    const logsSection = document.querySelector('.logs-section');
-                    if (logsSection) {
-                        logsSection.style.display = 'flex';
-                    }
-                }
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        }
-
-        function updateAppStatus(data) {
-            for (const [appKey, status] of Object.entries(data)) {
-                // Update status text
-                const statusDiv = document.querySelector(`#apps .app:has(#start-${appKey}) .status`);
-                if (statusDiv) {
-                    statusDiv.textContent = `Status: ${status}`;
-                }
-
-                // Update button states
-                const startButton = document.getElementById(`start-${appKey}`);
-                const stopButton = document.getElementById(`stop-${appKey}`);
-                const openButton = document.getElementById(`open-${appKey}`);
-
-                if (startButton) {
-                    startButton.disabled = (status === 'running');
-                }
-                if (stopButton) {
-                    stopButton.disabled = (status === 'stopped');
-                }
-                if (openButton) {
-                    openButton.disabled = (status === 'stopped');
-                }
-            }
-        }
-
-        function viewLogs(appKey, appName) {
-            currentLogApp = appKey;
-            currentLogAppName = appName;
-            document.getElementById('currentAppName').textContent = `Logs - ${appName}`;
-            document.getElementById('downloadLogsBtn').style.display = 'flex';
-            updateLogs();
-            
-            // Make sure logs section is visible
-            const logsSection = document.querySelector('.logs-section');
-            if (logsSection) {
-                logsSection.style.display = 'flex';
-            }
-        }
-
-        async function stopApp(appKey) {
-            try {
-                const response = await fetch(`/stop/${appKey}`);
-                const data = await response.json();
-                if (data.status === 'stopped' || data.status === 'already_stopped') {
-                    // Update button states
-                    const startButton = document.getElementById(`start-${appKey}`);
-                    const stopButton = document.getElementById(`stop-${appKey}`);
-                    const openButton = document.getElementById(`open-${appKey}`);
-
-                    if (startButton) startButton.disabled = false;  // Enable start button
-                    if (stopButton) stopButton.disabled = true;   // Disable stop button
-                    if (openButton) openButton.disabled = true;   // Disable open button
-
-                    // Update status text
-                    const statusDiv = document.querySelector(`#apps .app:has(#start-${appKey}) .status`);
-                    if (statusDiv) {
-                        statusDiv.textContent = 'Status: stopped';
-                    }
-                } else if (data.status === 'error') {
-                    alert(data.message);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        }
-
-        async function openApp(appKey, port) {
-            // *** lutzapps - support to run locally and new support for bkohya gradio url
-            // NOTE: ` (back-ticks) are used here for template literals
-            var url = `https://${podId}-${port}.proxy.runpod.net/`; // need to be declared as var
-            if (`${enable_unsecure_localhost}` === 'True') {
-                url = `http://localhost:${port}/`; // remove runpod.net proxy
-            }
-
-            // new: support gradio url for kohya_ss, e.g. https://b6365c256c395e755b.gradio.live
-            //if (`${appKey}` === 'bkohya' && `${app_status[appKey]['status']}` === 'running') { // get the latest data from the server
-            if (appKey == 'bkohya') { // get the latest data from the server
-                var response = await fetch('/get_bkohya_launch_url');
-                var result = await response.json();
-                
-                var launch_mode = result['mode']; // 'gradio' or 'local'
-                //alert('launch_mode=' + launch_mode);
-
-                var launch_url = result['url'];
-                //alert('launch_url=' + launch_url);
-
-                if (launch_url !== '') { // when a launch url is defined, the app is initialized and ready to be opened
-                    if (launch_mode === 'gradio') { // if it is a gradio url
-                        url = launch_url; // then use it, instead of the above defined CF proxy url
-                        //alert('using gradio for bkohya: ' + launch_url);
-                    }
-                    // else use the CF proxy url defined above for localhost, instead of the localhost url from the log
-                }   
-                else { // empty launch_url, waiting for launch url from log
-                    if (launch_mode === 'gradio') {
-                        alert('Waiting for Gradio URL to be generated ...');
-                    }
-                    else {
-                        alert('Waiting for lokal Launch URL to be generated ...');
-                    }
-                    return; // no lauch Url yet
-                }
-            }
-
-            //alert(`openApp URL=${url}`);
-
-            window.open(url, '_blank'); // open app window as popup window
-        }
-
-        async function updateStatus() {
-            const response = await fetch('/status');
-            const data = await response.json();
-            for (const [appKey, status] of Object.entries(data)) {
-                updateAppStatus(appKey, status);
-            }
-        }
-
-        function updateLogs() {
-            if (currentLogApp) {
-                fetch(`/logs/${currentLogApp}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const logsDiv = document.getElementById('logs');
-                        const wasScrolledToBottom = logsDiv.scrollHeight - logsDiv.clientHeight <= logsDiv.scrollTop + 1;
-                        logsDiv.textContent = data.logs.join('\n');
-                        if (wasScrolledToBottom) {
-                            logsDiv.scrollTop = logsDiv.scrollHeight;
-                        }
-                        document.getElementById('downloadLogsBtn').style.display = 'flex';
-                    });
-            } else {
-                document.getElementById('downloadLogsBtn').style.display = 'none';
-            }
-        }
-
-        async function forceKillApp(appKey) {
-            if (confirm(`Are you sure you want to force kill ${appKey}? This may cause data loss.`)) {
-                try {
-                    const response = await fetch(`/force_kill/${appKey}`, { method: 'POST' });
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const data = await response.json();
-                    if (data.status === 'killed') {
-                        updateAppStatus(appKey, 'stopped');
-                        alert(data.message);
-                    } else {
-                        alert(`Error: ${data.message}`);
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert(`Error killing ${appKey}: ${error.message}`);
-                }
-                await updateStatus();
-            }
-        }
-
-        function initializeUI() {
-            updateStatus();
-            // TODO: need a way this 2 functions not pollute the logs every second or 5 seconds
-            setInterval(updateStatus, 5000);
-            setInterval(updateLogs, 1000);
-
-            // Initialize model types
-            refreshModelTypes();
-        }
-
-        async function refreshModelTypes() {
-            var data = {};
-            data.cmd = 'refreshModelTypes';
-            await extendUIHelper(data); // lutzapps - initialize the available SHARED_MODEL_FOLDERS for the "Model Downloader" modelType select list
-        }
-
-        // lutzapps - populate modeltype select options from shared_models
-        async function extendUIHelper(data) {
-            // check the data
-            // if no data is passed, the default cmd is "selectModelType" with no specific "model_type",
-            // which means to re-select the last selected modelType option from the global var MODELTYPE_SELECTED
-            var cmd = "selectModelType"; // default cmd, when called with empty data or empty cmd
-            var model_type = MODELTYPE_SELECTED; // the 'modelType' option value (=foldername) for the select dropdown list
-            var token = ""; // the token value of HF_TOKEN or CIVITAI_API_TOKEN to pass to the corresponding WebUI Password fields on the "Models" tab
-
-            var response;
-            var result;
-
-            if (data !== undefined && data.cmd !== undefined) {
-                cmd = data.cmd;
-                if (cmd === "selectModelType" && data.model_type !== undefined) {
-                    model_type = data.model_type; // the model_type which is passed in to select
-                }
-                if ((cmd === "hfToken" || cmd === "civitaiToken") // cmd need to match the DOM id of the Password field on the "Models" tab
-                    && data.token !== undefined) {
-                    token = data.token; // if token = undefined or empty "", then the corresponding token get fetched from the server
-                }
-            }
-
-            //alert("extendUIHelper(): cmd=" + cmd +", model_type=" + model_type + ", token=" + token); // debug-info (DISABLED)
-
-            switch (cmd) {
-                case "civitaiToken":
-                    if (token === "") { // get the data from the Server
-                        response = await fetch('/get_civitai_token');
-                        result = await response.json();
-                        token = result['token'];
-                    }
-
-                    alert(cmd + "=" + token);
-                    // pass tokens from HF or CIVITAI ENV vars into their Password fields
-                    document.getElementById(cmd).value = token; //'********'; // indicate a found token, but require to call back
-
-                    break;
-
-                case "hfToken":
-                    if (token === "") { // get the data from the Server
-                        response = await fetch('/get_huggingface_token');
-                        result = await response.json();
-                        token = result['token'];
-                    }
-                
-                    alert(cmd + "=" + token);
-                    // pass tokens from HF or CIVITAI ENV vars into their Password fields
-                    document.getElementById(cmd).value = token; //'********'; // indicate a found token, but require to call back
-
-                    break;
-
-                case "refreshModelTypes":
-                    // refresh and optionally select the 'modelType' list for "Model Downloader"
-                    var modelTypeSelect = document.getElementById('modelType');
-                    if (!modelTypeSelect) {
-                        console.error('Model type select element not found');
-                        return;
-                    }
-
-                    try {
-                        // get the data from the Server
-                        response = await fetch('/get_model_types');
-                        result = await response.json();
-
-                        var model_types = result; // get the JSON-Object
-                        var count = Object.keys(model_types).length;
-
-                        var modelTypeSelected = modelTypeSelect.value; // remember the current selected modelType.option value
-                        modelTypeSelect.options.length = 0; // clear all current modelTypeSelect options
-
-                        if (count === 0) {
-                            // Add a default option if no model types are available
-                            const defaultOption = document.createElement('option');
-                            defaultOption.text = 'Please create shared folders first';
-                            defaultOption.value = '';
-                            modelTypeSelect.add(defaultOption);
-                            return;
-                        }
-
-                        for (i = 0; i < count; i++) {
-                            modelTypeOption = document.createElement('option');
-                            modelType = model_types[String(i)]['modelfolder'];
-                            modelTypeOption.setAttribute('value', modelType);
-                            modelTypeOption.appendChild(document.createTextNode(model_types[String(i)]['desc']));
-                            modelTypeSelect.appendChild(modelTypeOption);
-                        }
-
-                        if (modelTypeSelected === "") {
-                            modelTypeSelect.selectedIndex = 0;
-                            MODELTYPE_SELECTED = modelTypeSelect.options[0].value;
-                        } else {
-                            modelTypeSelect.value = modelTypeSelected;
-                            MODELTYPE_SELECTED = modelTypeSelected;
-                        }
-                    } catch (error) {
-                        console.error('Error refreshing model types:', error);
-                    }
-                    break;
-
-                case "selectModelType":
-                    // this is called by model_utils:download_civitai_model() which passed the downloading 'model_type'
-                    // to select for clarity, which can be different from the currently selected modelType option
-                    // if called without a 'model_type', the last MODELTYPE_SELECTED will be selected (after a "Tab Switch")
-
-                    // refresh and optionally select the 'modelType' list for "Model Downloader"
-                    var modelTypeSelect = document.getElementById('modelType');
-                    modelTypeSelect.value = model_type;
-                    MODELTYPE_SELECTED = model_type; // NOT handled by the onchange() event handler
-
-                    break;
-
-                default: // no cmd passed is same as "selectModelType" without a 'model_type'
-                    // this is already handled by "selectModelType" defaults, there is no "default" case needed here
-            }
-        }
-
-        async function downloadModel() {
-            const url = document.getElementById('modelUrl').value;
-            const modelName = document.getElementById('modelName').value;
-            const modelType = document.getElementById('modelType').value;
-            //const hfToken = document.getElementById('hfToken').value;
-            let hfToken = null;
-            let civitaiToken = null;
-
-            // lutzapps - support HF_TOKEN ENV var
-            // Check if the URL is from Huggingface
-            if (url.toLowerCase().includes('huggingface.co')) { // be case-insensitive with this url
-                hfToken = document.getElementById('hfToken').value;
-                if (hfToken === '********') {
-                    // if the token is masked, fetch it from the server
-                    const response = await fetch('/get_huggingface_token');
-                    const result = await response.json();
-                    hfToken = result.token;
-                }
-            }        
-            // Check if the URL is from Civitai
-            if (url.toLowerCase().includes('civitai.com')) { // lutzapps - be case-insensitive with this url
-                civitaiToken = document.getElementById('civitaiToken').value;
-                if (civitaiToken === '********') {
-                    // If the token is masked, fetch it from the server
-                    const response = await fetch('/get_civitai_token');
-                    const result = await response.json();
-                    civitaiToken = result.token;
-                }
-                
-                if (!civitaiToken) {
-                    alert('Civitai API token is required for Civitai URLs. Please enter it in the Civitai API Token field.');
-                    return;
-                }
-            }
-            
-            await startModelDownload(url, modelName, modelType, civitaiToken, hfToken);
-        }
-
-
-        async function startModelDownload(url, modelName, modelType, civitaiToken, hfToken, versionId = null, fileIndex = null) {
-            const progressBar = document.querySelector('#model-download-progress .progress-bar-fill');
-            const statusDiv = document.getElementById('model-download-status');
-            const speedDiv = document.getElementById('model-download-speed');
-            const etaDiv = document.getElementById('model-download-eta');
-
-            document.getElementById('model-download-progress').style.display = 'block';
-            progressBar.style.width = '0%';
-            progressBar.textContent = '0%';
-            statusDiv.textContent = 'Starting download...';
-            speedDiv.textContent = '';
-            etaDiv.textContent = '';
-
-            try {
-                const response = await fetch('/download_model', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ 
-                        url, 
-                        model_name: modelName, 
-                        model_type: modelType,
-                        civitai_token: civitaiToken,
-                        hf_token: hfToken,
-                        version_id: versionId,
-                        file_index: fileIndex
-                    }),
-                });
-
-                const result = await response.json();
-                if (result.status === 'success') {
-                    statusDiv.textContent = result.message;
-                    progressBar.style.width = '100%';
-                    progressBar.textContent = '100%';
-                    await loadModelFolders();
-                    // Remove showRecreateSymlinksButton call since it's automatic now
-                } else if (result.status === 'choice_required') {
-                    if (result.data.type === 'file') {
-                        showFileChoiceDialog(result.data, url, modelName, modelType, civitaiToken, hfToken);
-                    } else if (result.data.type === 'version') {
-                        showVersionChoiceDialog(result.data, url, modelName, modelType, civitaiToken, hfToken);
-                    }
-                } else {
-                    statusDiv.textContent = `Error: ${result.message}`;
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                statusDiv.textContent = `Error: ${error.message}`;
-            }
-        }
-
-
-        function showVersionChoiceDialog(data, url, modelName, modelType, civitaiToken, hfToken) {
-        const dialogContent = `
-            <h3>Multiple versions available. Please choose one:</h3>
-            <ul>
-                ${data.versions.map((version, index) => `
-                    <li>
-                        <button onclick="selectVersion(${version.id}, '${url}', '${modelName}', '${modelType}', '${civitaiToken}', '${hfToken}')">
-                            ${version.name} (Created: ${new Date(version.createdAt).toLocaleString()})
-                        </button>
-                    </li>
-                `).join('')}
-            </ul>
-        `;
-        showDialog(dialogContent);
+    const appStatuses = {};
+    let currentLogApp = null;
+    let currentLogAppName = null;
+    const podId = '{{ pod_id }}';
+    const WS_PORT = 7222;  // This is the Nginx port
+
+    // lutzapps - remember the last know MODELTYPE_SELECTED of the WebUI Dom Id 'modelType' "select dropdown" model list
+    // so the selection can be restored between "Tab Switches", and during refreshes/reloads of the modelType list
+    // this is handled by the extendUIHelper() function, which is called directly from JavaScript events,
+    // but is also called indirectly from Python code via WS message type='extend_ui_helper'
+    // e.g. from the model_utils:download_civitai_model() function, to preserve "state" of the selected modelType
+
+    let MODELTYPE_SELECTED = "";
+    modelType.onchange = function() {
+        MODELTYPE_SELECTED = this.value;
+        alert("onchange=" + MODELTYPE_SELECTED);
     }
 
-        function showFileChoiceDialog(data, url, modelName, modelType, civitaiToken, hfToken) {
-            const modalContent = `
-                <div class="modal-content">
-                    <span class="close">&times;</span>
-                    <h3>Multiple files available. Please choose one:</h3>
-                    <ul>
-                        ${data.files.map((file, index) => `
-                            <li>
-                                <button onclick="selectFile(${index}, '${url}', '${modelName}', '${modelType}', '${civitaiToken}', '${hfToken}', ${data.version_id})">
-                                    ${file.name} (${formatSize(file.size * 1024)}, Type: ${file.type})
-                                </button>
-                            </li>
-                        `).join('')}
-                    </ul>
-                </div>
-            `;
-            
-            const modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.innerHTML = modalContent;
-            document.body.appendChild(modal);
-            
-            modal.style.display = 'block';
-            
-            const closeBtn = modal.querySelector('.close');
-            closeBtn.onclick = function() {
-                document.body.removeChild(modal);
-            }
-            
-            window.onclick = function(event) {
-                if (event.target == modal) {
-                    document.body.removeChild(modal);
-                }
-            }
-        } // Added missing closing bracket here
+    // *** lutzapps - Change #2 - support to run locally at http://localhost:${WS_PORT} (3 locations in "index.html")
+    const enable_unsecure_localhost = '{{ enable_unsecure_localhost }}';
 
-        function selectVersion(versionId, url, modelName, modelType, civitaiToken, hfToken) {
-            document.body.removeChild(document.body.lastChild); // Remove the dialog
-            startModelDownload(url, modelName, modelType, civitaiToken, hfToken, versionId);
-        }
+    // default is to use the "production" WeckSockets CloudFlare URL
+    // NOTE: ` (back-ticks) are used here for template literals
+    var WS_URL = `wss://${podId}-${WS_PORT}.proxy.runpod.net/ws`; // need to be declared as var
 
-        function selectFile(fileIndex, url, modelName, modelType, civitaiToken, hfToken, versionId) {
-            const modal = document.querySelector('.modal');
-            document.body.removeChild(modal);
-            startModelDownload(url, modelName, modelType, civitaiToken, hfToken, versionId, fileIndex);
-        }
+    if (`${enable_unsecure_localhost}` === 'True') { // value of LOCAL_DEBUG ENV var
+        // make sure to use "ws" Protocol (insecure) instead of "wss" (WebSockets Secure) for localhost,
+        // otherwise you will get the 'loadingOverlay' stay and stays on screen with ERROR:
+        // "WebSocket disconnected. Attempting to reconnect..." blocking the webpage http://localhost:7222
+        WS_URL = `ws://localhost:${WS_PORT}/ws`; // localhost WS (unsecured)
+        //alert(`Running locally with WS_URL=${WS_URL}`);
+    }
 
-        async function loadModelFolders() {
-            try {
-                const response = await fetch('/get_model_folders');
-                const folders = await response.json();
-                const modelFoldersDiv = document.getElementById('model-folders');
-                modelFoldersDiv.innerHTML = '';
+    let socket;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    const reconnectInterval = 5000; // 5 seconds
 
-                for (const [folderName, folderInfo] of Object.entries(folders)) {
-                    const folderDiv = document.createElement('div');
-                    folderDiv.className = 'model-folder';
-                    folderDiv.innerHTML = `
-                        <h4>${folderName}</h4>
-                        <p>Size: ${folderInfo.size}</p>
-                        <p>Files: ${folderInfo.file_count}</p>
-                    `;
-                    modelFoldersDiv.appendChild(folderDiv);
-                }
-            } catch (error) {
-                console.error('Error loading model folders:', error);
-            }
-        }
+    function connectWebSocket() {
+        console.log("Attempting to connect to WebSocket...");
+        document.getElementById('loadingMessage').textContent = 'Connecting to WebSocket...';
 
-        async function saveCivitaiToken() {
-            // Get token from the main Civitai token input field
-            const token = document.getElementById('civitaiToken').value;
-            if (!token) {
-                alert('Please enter a Civitai API token');
-                return;
-            }
+        socket = new WebSocket(WS_URL);
 
-            try {
-                const response = await fetch('/save_civitai_token', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ token: token }),
-                });
-                const result = await response.json();
-                if (result.status === 'success') {
-                    // Update both token fields to show it's saved
-                    document.getElementById('civitaiToken').value = '********';
-                    document.getElementById('civitaiTokenSave').value = '********';
-                    alert('Civitai token saved successfully.');
-                } else {
-                    alert(`Error: ${result.message}`);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert(`Error: ${error.message}`);
-            }
-        }
-
-        async function loadCivitaiToken() {
-            try {
-                const response = await fetch('/get_civitai_token');
-                const result = await response.json();
-                if (result.token) {
-                    document.getElementById('civitaiToken').value = '********';
-                    document.getElementById('civitaiTokenSave').value = '********';
-                }
-            } catch (error) {
-                console.error('Error loading Civitai token:', error);
-            }
-        }
-
-        // lutzapps - added HF_TOKEN support
-        async function loadHFToken() {
-            try {
-                const response = await fetch('/get_huggingface_token');
-                const result = await response.json();
-                if (result.token) {
-                    document.getElementById('hfToken').value = '********';
-                }
-            } catch (error) {
-                console.error('Error loading Huggingface token:', error);
-            }
-        }
-
-        function formatSize(bytes) {
-            if (!bytes || isNaN(bytes)) return '0 B';
-            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-            const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), sizes.length - 1);
-            const size = bytes / Math.pow(1024, i);
-            return `${size.toFixed(2)} ${sizes[i]}`;
-        }
-
-        function formatTime(seconds) {
-            if (isNaN(seconds) || seconds < 0) {
-                return 'Calculating...';
-            }
-            if (seconds < 60) {
-                return `${seconds} seconds`;
-            } else if (seconds < 3600) {
-                return `${Math.floor(seconds / 60)} minutes ${seconds % 60} seconds`;
-            } else {
-                const hours = Math.floor(seconds / 3600);
-                const minutes = Math.floor((seconds % 3600) / 60);
-                return `${hours} hours ${minutes} minutes`;
-            }
-        }
-
-        // Example URLs - lutzapps - TODO: enrich data
-        const exampleUrls = {
-            'Stable-diffusion': 'https://civitai.com/models/90352/dreamshaper',
-            'Lora': 'https://civitai.com/models/58390?modelVersionId=62833',
-            'VAE': 'https://huggingface.co/stabilityai/sd-vae-ft-mse-original/blob/main/vae-ft-mse-840000-ema-pruned.safetensors',
-            'ESRGAN': 'https://civitai.com/models/116225?modelVersionId=125843',
-            'Flux-Dev': 'https://civitai.com/models/618692?modelVersionId=691639',
-            'Flux-Schnell': 'https://civitai.com/models/618692?modelVersionId=699279'
+        socket.onopen = function(e) {
+            console.log("Connected to WebSocket");
+            document.getElementById('loadingOverlay').style.display = 'none';
+            reconnectAttempts = 0;
+            initializeUI();
+            // Start sending heartbeats immediately after connection
+            startHeartbeat();
         };
 
-        function updateExampleUrls() {
-            document.getElementById('example-sd').textContent = exampleUrls['Stable-diffusion'];
-            document.getElementById('example-lora').textContent = exampleUrls['Lora'];
-            document.getElementById('example-vae').textContent = exampleUrls['VAE'];
-            document.getElementById('example-upscaler').textContent = exampleUrls['ESRGAN'];
-            document.getElementById('example-flux-dev').textContent = exampleUrls['Flux-Dev'];
-            document.getElementById('example-flux-schnell').textContent = exampleUrls['Flux-Schnell'];
-        }
-
-        // lutzapps - replace function copyToClipboard() with function useInModelDownloader()
-        function useInModelDownloader(modelType, modelUrl) {
-            // copy the downloadUrl in the Model Downloader "Url" textbox
-            document.getElementById('modelUrl').value = modelUrl;
-
-            // select the modelType in the modelType select list, we are just about to download
-            var data = {};
-            data.cmd = 'selectModelType';
-            data.model_type = modelType;
-            extendUIHelper(data);
-
-            navigator.clipboard.writeText(modelUrl).then(() => {
-                alert('URL copied to Downloader and into the Clipboard!');
-            }, (err) => {
-                console.error('Could not copy text: ', err);
-            });
-        }
-
-        // Call this function when the Models tab is opened
-        document.querySelector('.navbar-tabs a[onclick="openTab(event, \'models-tab\')"]').addEventListener('click', function() {
-            loadModelFolders();
-            refreshModelTypes();  // Refresh model types when switching to Models tab
-            loadCivitaiToken();
-            loadHFToken();
-            updateExampleUrls();
-        });
-
-        // Initialize WebSocket connection
-        connectWebSocket();
-
-        // ... (keep any remaining code)
-
-        function openTab(evt, tabName) {
-            var i, tabContent, tabLinks;
-            tabContent = document.getElementsByClassName("tab-content");
-            for (i = 0; i < tabContent.length; i++) {
-                tabContent[i].style.display = "none";
-            }
-            tabLinks = document.getElementsByClassName("tab-link");
-            for (i = 0; i < tabLinks.length; i++) {
-                tabLinks[i].className = tabLinks[i].className.replace(" active", "");
-            }
-            document.getElementById(tabName).style.display = "block";
-            evt.currentTarget.className += " active";
-
-            // Additional actions when switching tabs
-            if (tabName === 'apps-tab') {
-                document.querySelector('.logs-section').style.display = 'flex';
-                updateLogs(); // Refresh logs when switching back to the "Apps" tab
-            } else if (tabName === 'models-tab') {
-                // lutzapps - the following event handler functions already fired
-                // in the queryselector eventhandler (esspecially for the "models-tab" tab)
-                //loadModelFolders();
-                //loadCivitaiToken();
-                //loadHFToken(); // lutzapps - added HF_TOKEN Support
-            } else if (tabName === 'settings-tab') {
-                loadSshDetails();
-                // Remove updateFileBrowserStatus() from here
-            }
-        }
-
-        function loadSshDetails() {
-            const ip = '{{ RUNPOD_PUBLIC_IP }}';
-            const port = '{{ RUNPOD_TCP_PORT_22 }}';
-            const sshCommand = `ssh root@${ip} -p ${port}`;
-            document.getElementById('sshIp').textContent = ip;
-            document.getElementById('sshPort').textContent = port;
-            document.getElementById('sshCommand').textContent = sshCommand;
-
-            const newSshPassword = document.getElementById('newSshPassword');
-            const passwordButtons = document.querySelector('.password-buttons');
-            
-            if ('{{ ssh_password_status }}' === 'set') {
-                newSshPassword.placeholder = "Password is set (hidden)";
-                passwordButtons.style.display = 'flex';
-            } else {
-                newSshPassword.placeholder = "Enter new SSH password";
-                passwordButtons.style.display = 'flex';
-            }
-        }
-
-        // Add this at the end of your script section
-        document.addEventListener('DOMContentLoaded', function() {
-            loadSshDetails();
-            // ... any other initialization code ...
-        });
-
-        function copySshCommand() {
-                const sshCommand = document.getElementById('sshCommand').textContent;
-                navigator.clipboard.writeText(sshCommand).then(() => {
-                    alert('SSH command copied to clipboard!');
-                }, (err) => {
-                    console.error('Could not copy text: ', err);
-                    alert('Failed to copy SSH command. Please copy it manually.');
-                });
-            }
-
-        function togglePasswordVisibility() {
-                const passwordInput = document.getElementById('newSshPassword');
-                if (passwordInput.type === 'password') {
-                    passwordInput.type = 'text';
-                    if (passwordInput.placeholder === "Password is set (hidden)") {
-                        passwordInput.value = "{{ ssh_password }}";
-                    }
-                    } else {
-                    passwordInput.type = 'password';
-                    if (passwordInput.value === "{{ ssh_password }}") {
-                        passwordInput.value = '';
-                        passwordInput.placeholder = "Password is set (hidden)";
-                    }
-                }
-            }
-
-        async function setCustomSshPassword() {
-                const newPassword = document.getElementById('newSshPassword').value;
-                if (!newPassword) {
-                    alert('Please enter a password.');
-                    return;
-                }
-                
-                if (confirm('Warning: Password-based SSH authentication is less secure than key-based authentication. Are you sure you want to set a password?')) {
-                    try {
-                        const response = await fetch('/set_ssh_password', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ password: newPassword }),
-                        });
-                        const result = await response.json();
-                        if (result.status === 'success') {
-                            alert('SSH password set successfully.');
-                            document.getElementById('newSshPassword').value = '';
-                            document.getElementById('newSshPassword').placeholder = 'Password is set (hidden)';
-                        } else {
-                            alert('Failed to set SSH password: ' + result.message);
-                        }
-                    } catch (error) {
-                        console.error('Error setting SSH password:', error);
-                        alert('An error occurred while setting the SSH password.');
-                    }
-                }
-            }
-
-        function openFileBrowser() {
-            const podId = '{{ pod_id }}';
-
-            // *** lutzapps - Change #5 - support to run locally
-            // NOTE: ` (back-ticks) are used here for template literals
-            var url = `https://${podId}-7222.proxy.runpod.net/fileapp/`; // need to be declared as var
-            if (`${enable_unsecure_localhost}` === 'True') {
-                url = `http://localhost:7222/fileapp/`; // remove runpod.net proxy
-                //alert(`FileBrowser URL=${url}`);
-            }
-
-            window.open(url, '_blank');
-        }
-
-            async function controlFileBrowser(action) {
-                try {
-                    const response = await fetch(`/${action}_filebrowser`);
-                    const result = await response.json();
-                    if (result.status === 'started' || result.status === 'stopped') {
-                        // Remove updateFileBrowserStatus() from here
-                    }
-                } catch (error) {
-                    console.error('Error controlling File Browser:', error);
-                }
-            }
-
-            // Reduce the frequency of status updates
-            // Remove this interval
-            // setInterval(updateFileBrowserStatus, 30000); // Check every 30 seconds instead of 5 seconds
-
-            // Update the DOMContentLoaded event listener
-            document.addEventListener('DOMContentLoaded', function() {
-                loadSshDetails();
-                // ... (other initialization code)
-            });
-        // Update the Settings tab click handler
-        document.querySelector('.navbar-tabs a[onclick="openTab(event, \'settings-tab\')"]').addEventListener('click', function() {
-            loadSshDetails();
-            // Remove updateFileBrowserStatus() from here
-        });
-
-        async function installApp(appKey) {
-                const installButton = document.getElementById(`install-${appKey}`);
-                const progressContainer = document.getElementById(`install-progress-${appKey}`);
-                const logsContainer = document.getElementById(`install-logs-${appKey}`);
-
-                installButton.disabled = true;
-                progressContainer.style.display = 'block';
-                logsContainer.style.display = 'block';
-                logsContainer.textContent = '';
-
-                try {
-                    const response = await fetch(`/install/${appKey}`, { method: 'POST' });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    const contentType = response.headers.get("content-type");
-                    if (contentType && contentType.indexOf("application/json") !== -1) {
-                        const data = await response.json();
-                        if (data.status !== 'success') {
-                            throw new Error(data.message);
-                        }
-                    } else {
-                        throw new Error("Received non-JSON response from server");
-                    }
-
-                    // Don't reload the page here, wait for the WebSocket 'install_complete' message
-                } catch (error) {
-                    console.error('Installation error:', error);
-                    appendToInstallLogs({app_name: appKey, log: `Error: ${error.message}`});
-                }
-            // Don't re-enable the button here, it will be handled by the WebSocket messages
-        }
-
-        // Update the WebSocket message handler
         socket.onmessage = function(event) {
             try {
                 const data = JSON.parse(event.data);
-                console.log("WebSocket message received:", data);
-
+                console.log(`Data received from server:`, data);
+                
                 if (data.type === 'heartbeat') {
                     // Reset heartbeat timeout on receiving heartbeat response
                     resetHeartbeatTimeout();
-                } else if (data.type === 'install_progress') {
-                    updateInstallProgress(data.data);
-                } else if (data.type === 'install_log') {
-                    appendToInstallLogs(data.data);
                 } else if (data.type === 'model_download_progress') {
                     updateModelDownloadProgress(data.data);
                 } else if (data.type === 'status_update') {
                     updateAppStatus(data.data);
-                // lutzapps - use the extendUIHelper to "bridge" certain extensions between Python and JavaScript
-                } else if (data.type === 'extend_ui_helper') {
-                    extendUIHelper(data.data);
                 }
                 // Handle other message types as needed
             } catch (error) {
@@ -3688,264 +2738,1513 @@
             }
         };
 
-        function updateInstallProgress(data) {
-                const progressContainer = document.getElementById(`install-progress-${data.app_name}`);
-                const downloadProgress = progressContainer.querySelector('.download-progress');
-                const unpackProgress = progressContainer.querySelector('.unpack-progress');
-                const speedDisplay = progressContainer.querySelector('.download-speed');
-                const etaDisplay = progressContainer.querySelector('.download-eta');
-                const stageDisplay = progressContainer.querySelector('.install-stage');
+        socket.onclose = function(event) {
+            if (event.wasClean) {
+                console.log(`Connection closed cleanly, code=${event.code} reason=${event.reason}`);
+            } else {
+                console.log('Connection died');
+            }
+            handleReconnect();
+        };
+
+        socket.onerror = function(error) {
+            console.log(`WebSocket Error: ${error.message}`);
+            handleReconnect();
+        };
+    }
+
+    let heartbeatInterval;
+    let heartbeatTimeout;
+
+    function startHeartbeat() {
+        // Clear any existing intervals
+        if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+        }
+        
+        // Send heartbeat every 60 seconds
+        heartbeatInterval = setInterval(() => {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'heartbeat' }));
+                // Set timeout to reconnect if no response within 10 seconds
+                setHeartbeatTimeout();
+            }
+        }, 60000);
+    }
+
+    function setHeartbeatTimeout() {
+        if (heartbeatTimeout) {
+            clearTimeout(heartbeatTimeout);
+        }
+        heartbeatTimeout = setTimeout(() => {
+            console.log("Heartbeat timeout - attempting reconnect...");
+            if (socket) {
+                socket.close();
+            }
+            handleReconnect();
+        }, 65000); // Increased timeout to 65 seconds
+    }
+
+    function resetHeartbeatTimeout() {
+        if (heartbeatTimeout) {
+            clearTimeout(heartbeatTimeout);
+        }
+    }
+
+    // Clean up on page unload
+    window.addEventListener('beforeunload', () => {
+        if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+        }
+        if (heartbeatTimeout) {
+            clearTimeout(heartbeatTimeout);
+        }
+        if (socket) {
+            socket.close();
+        }
+    });
+
+    function handleReconnect() {
+        if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            document.getElementById('loadingMessage').textContent = 
+                `WebSocket disconnected. Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`;
+            
+            // Add exponential backoff
+            const backoffTime = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+            setTimeout(connectWebSocket, backoffTime);
+        } else {
+            document.getElementById('loadingMessage').textContent = 
+                'Failed to connect to WebSocket. Installation continues in background. Please refresh page to see status.';
+        }
+    }
+
+    function sendWebSocketMessage(type, data) {
+        if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type, data }));
+        }
+    }
+
+    let lastUpdateTime = 0;
+    const updateInterval = 250; // Update every 250ms
+
+    function updateModelDownloadProgress(data) {
+        const currentTime = Date.now();
+        if (currentTime - lastUpdateTime < updateInterval) {
+            return; // Skip update if it's too soon
+        }
+        lastUpdateTime = currentTime;
+
+        const progressBar = document.querySelector('#model-download-progress .progress-bar-fill');
+        const statusDiv = document.getElementById('model-download-status');
+        const speedDiv = document.getElementById('model-download-speed');
+        const etaDiv = document.getElementById('model-download-eta');
+        
+        if (data.percentage !== undefined) {
+            progressBar.style.width = `${data.percentage}%`;
+            progressBar.textContent = `${data.percentage.toFixed(2)}%`;
+        }
+        
+        statusDiv.textContent = data.message || '';
+        
+        if (data.speed) {
+            speedDiv.textContent = `Speed: ${data.speed}`;
+        } else {
+            speedDiv.textContent = 'Speed: N/A';
+        }
+        
+        if (data.eta) {
+            etaDiv.textContent = `ETA: ${formatTime(data.eta)}`;
+        } else {
+            etaDiv.textContent = 'ETA: Calculating...';
+        }
+        
+        if (data.stage === 'Complete') {
+            // lutzapps - clear 'Speed: N/A' and 'ETA: Calculating...' Div textContent, when no eta/speed data, but 'Complete'
+            etaDiv.textContent = '';
+            speedDiv.textContent = '';
+            loadModelFolders(); // Refresh the Existing Models section when download is complete
+        }
+    }
+
+    function updateAppStatus(appKey, status) {
+        appStatuses[appKey] = status;
+        const statusElement = document.getElementById(`status-${appKey}`);
+        if (statusElement) {
+            statusElement.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+            statusElement.className = `status status-${status}`;
+            document.getElementById(`start-${appKey}`).disabled = (status === 'running');
+            document.getElementById(`stop-${appKey}`).disabled = (status === 'stopped');
+            document.getElementById(`open-${appKey}`).disabled = (status === 'stopped');
+        }
+    }
+
+    async function startApp(appKey) {
+        try {
+            const response = await fetch(`/start/${appKey}`);
+            const data = await response.json();
+            if (data.status === 'started' || data.status === 'already_running') {
+                updateAppStatus({ [appKey]: 'running' });
+                // Get the app name from app_configs and show logs
+                const appName = app_configs[appKey].name;
+                // Switch to logs view
+                currentLogApp = appKey;
+                currentLogAppName = appName;
+                document.getElementById('currentAppName').textContent = `Logs - ${appName}`;
+                document.getElementById('downloadLogsBtn').style.display = 'flex';
+                document.getElementById('logs').textContent = ''; // Clear existing logs
+                updateLogs(); // Start updating logs
                 
-                progressContainer.style.display = 'block';
-                
-                if (data.stage === 'Downloading') {
-                    downloadProgress.style.width = `${data.percentage}%`;
-                    downloadProgress.textContent = `${data.percentage.toFixed(2)}%`;
-                    speedDisplay.textContent = `Speed: ${data.speed}`;
-                    etaDisplay.textContent = `ETA: ${formatTime(parseInt(data.eta))}`;
-                } else if (data.stage === 'Unpacking') {
-                    unpackProgress.style.width = `${data.percentage}%`;
-                    unpackProgress.textContent = `${data.percentage.toFixed(2)}%`;
-                    speedDisplay.textContent = `Processed: ${data.processed} / ${data.total} files`;
-                    etaDisplay.textContent = '';
-                } else if (data.stage === 'Download Complete') {
-                    downloadProgress.style.width = '100%';
-                    downloadProgress.textContent = '100%';
-                    speedDisplay.textContent = '';
-                    etaDisplay.textContent = '';
+                // Make sure logs section is visible
+                const logsSection = document.querySelector('.logs-section');
+                if (logsSection) {
+                    logsSection.style.display = 'flex';
                 }
-                
-            stageDisplay.textContent = `Stage: ${data.stage}`;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+
+    function updateAppStatus(data) {
+        for (const [appKey, status] of Object.entries(data)) {
+            // Update status text
+            const statusDiv = document.querySelector(`#apps .app:has(#start-${appKey}) .status`);
+            if (statusDiv) {
+                statusDiv.textContent = `Status: ${status}`;
+            }
+
+            // Update button states
+            const startButton = document.getElementById(`start-${appKey}`);
+            const stopButton = document.getElementById(`stop-${appKey}`);
+            const openButton = document.getElementById(`open-${appKey}`);
+
+            if (startButton) {
+                startButton.disabled = (status === 'running');
+            }
+            if (stopButton) {
+                stopButton.disabled = (status === 'stopped');
+            }
+            if (openButton) {
+                openButton.disabled = (status === 'stopped');
+            }
+        }
+    }
+
+    function viewLogs(appKey, appName) {
+        currentLogApp = appKey;
+        currentLogAppName = appName;
+        document.getElementById('currentAppName').textContent = `Logs - ${appName}`;
+        document.getElementById('downloadLogsBtn').style.display = 'flex';
+        updateLogs();
+        
+        // Make sure logs section is visible
+        const logsSection = document.querySelector('.logs-section');
+        if (logsSection) {
+            logsSection.style.display = 'flex';
+        }
+    }
+
+    async function stopApp(appKey) {
+        try {
+            if (appKey == 'bkohya') {
+                //port = app_config['port']
+                port = 6006;
+
+                const responseTB = await fetch(`/force_kill_by_port/${port}`, { method: 'GET' });
+                const dataTB = await responseTB.json();
+                if (dataTB.status === 'killed') {
+                    alert('TENSORBOARD app found and killed!');
+                }
+            }
+
+            const response = await fetch(`/stop/${appKey}`, { method: 'GET' });
+            const data = await response.json();
+            if (data.status === 'stopped' || data.status === 'already_stopped') {
+                // Update button states
+                const startButton = document.getElementById(`start-${appKey}`);
+                const stopButton = document.getElementById(`stop-${appKey}`);
+                const openButton = document.getElementById(`open-${appKey}`);
+
+                if (startButton) startButton.disabled = false;  // Enable start button
+                if (stopButton) stopButton.disabled = true;   // Disable stop button
+                if (openButton) openButton.disabled = true;   // Disable open button
+
+                // Update status text
+                const statusDiv = document.querySelector(`#apps .app:has(#start-${appKey}) .status`);
+                if (statusDiv) {
+                    statusDiv.textContent = 'Status: stopped';
+                }
+            } else if (data.status === 'error') {
+                alert(data.message);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+
+    async function openApp(appKey, port) {
+        // *** lutzapps - support to run locally and new support for bkohya gradio url
+        // NOTE: ` (back-ticks) are used here for template literals
+        var url = `https://${podId}-${port}.proxy.runpod.net/`; // need to be declared as var
+        if (`${enable_unsecure_localhost}` === 'True') {
+            url = `http://localhost:${port}/`; // remove runpod.net proxy
         }
 
-        function formatTime(seconds) {
-                if (seconds < 60) {
-                    return `${seconds} seconds`;
-                } else if (seconds < 3600) {
-                    return `${Math.floor(seconds / 60)} minutes ${seconds % 60} seconds`;
-                } else {
-                    const hours = Math.floor(seconds / 3600);
-                    const minutes = Math.floor((seconds % 3600) / 60);
-                    return `${hours} hours ${minutes} minutes`;
+        // new: support gradio url for kohya_ss, e.g. https://b6365c256c395e755b.gradio.live
+        //if (`${appKey}` === 'bkohya' && `${app_status[appKey]['status']}` === 'running') { // get the latest data from the server
+        if (appKey == 'bkohya') { // get the latest data from the server
+            var response = await fetch('/get_bkohya_launch_url', { method: 'GET' });
+            var result = await response.json();
+            
+            var launch_mode = result['mode']; // 'gradio' or 'local'
+            //alert('launch_mode=' + launch_mode);
+
+            var launch_url = result['url'];
+            //alert('launch_url=' + launch_url);
+
+            if (launch_url !== '') { // when a launch url is defined, the app is initialized and ready to be opened
+                if (launch_mode === 'gradio') { // if it is a gradio url
+                    url = launch_url; // then use it, instead of the above defined CF proxy url
+                    //alert('using gradio for bkohya: ' + launch_url);
                 }
+                // else use the CF proxy url defined above for localhost, instead of the localhost url from the log
+            }   
+            else { // empty launch_url, waiting for launch url from log
+                if (launch_mode === 'gradio') {
+                    alert('Waiting for Gradio URL to be generated ...');
+                }
+                else {
+                    alert('Waiting for local Launch URL to be generated ...');
+                }
+                return; // no lauch Url yet
             }
 
-            function appendToInstallLogs(data) {
-                const logsContainer = document.getElementById(`install-logs-${data.app_name}`);
-                const logEntry = document.createElement('div');
-                logEntry.textContent = data.log;
-                logsContainer.appendChild(logEntry);
-                logsContainer.scrollTop = logsContainer.scrollHeight;
-            }
-
-            function handleInstallComplete(data) {
-                const installButton = document.getElementById(`install-${data.app_name}`);
-                if (data.status === 'success') {
-                    console.log(data.message);
-                    location.reload();  // Reload the page to reflect the new installation status
-                } else {
-                    console.error(`Installation failed: ${data.message}`);
-                installButton.disabled = false;  // Re-enable the button only on failure
-            }
+            // open additional tensorboard url
+            tensorboard_url = "http://localhost:6006/tensorboard";
+            window.open(tensorboard_url, target='_blank', rel='noopener noreferrer');
         }
 
-        async function fixCustomNodes(appKey) {
-                const fixButton = document.getElementById('fix-custom-nodes-' + appKey);
+        //alert(`openApp URL=${url}`);
+
+        window.open(url, target='_blank', rel='noopener noreferrer'); // open app window as popup window (need to allow popup-windows in Chrome!)
+    }
+
+    async function updateStatus() {
+        const response = await fetch('/status');
+        const data = await response.json();
+        for (const [appKey, status] of Object.entries(data)) {
+            updateAppStatus(appKey, status);
+        }
+    }
+
+    function updateLogs() {
+        if (currentLogApp) {
+            fetch(`/logs/${currentLogApp}`)
+                .then(response => response.json())
+                .then(data => {
+                    const logsDiv = document.getElementById('logs');
+                    const wasScrolledToBottom = logsDiv.scrollHeight - logsDiv.clientHeight <= logsDiv.scrollTop + 1;
+                    logsDiv.textContent = data.logs.join('\n');
+                    if (wasScrolledToBottom) {
+                        logsDiv.scrollTop = logsDiv.scrollHeight;
+                    }
+                    document.getElementById('downloadLogsBtn').style.display = 'flex';
+                });
+        } else {
+            document.getElementById('downloadLogsBtn').style.display = 'none';
+        }
+    }
+
+    async function forceKillApp(appKey) {
+        if (confirm(`Are you sure you want to FORCE KILL the app '${appKey}'?\nThis may cause data loss!`)) {
+            try {
+                const response = await fetch(`/force_kill/${appKey}`, { method: 'GET' });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                if (data.status === 'killed') {
+                    updateAppStatus(appKey, 'stopped');
+                    alert(data.message);
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert(`Error killing ${appKey}: ${error.message}`);
+            }
+            await updateStatus();
+        }
+    }
+
+    async function checkAppInstallation(appKey) {
+        //alert('check ' + appKey);
+
+        try {
+            // Update status text
+            const statusDiv = document.querySelector(`#apps .app:has(#check-installation-${appKey}) .status`);
+            if (statusDiv) {
+                statusDiv.textContent = 'Status: checking ...';
+            }
+
+            const response = await fetch(`/check_installation/${appKey}`, { method: 'GET' });
+            const data = await response.json();
+            if (data.status === 'checked') {
+                // Update status text
+                if (statusDiv) {
+                    statusDiv.textContent = 'Status: checked successfully';
+                }
+                alert(data.message) // alert the details of the successful verification
+            } else if (data.status === 'error') {
+                // Update status text
+                if (statusDiv) {
+                    statusDiv.textContent = 'Status: check was unsuccessful!';
+                }
+
+                //alert(data.message);
+                // send the failed check to confirm for delete the app
+                deleteAppInstallation(appKey, data.message);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert(`Error checking ${appKey}: ${error.message}`);
+        }
+    }
+
+    async function refreshAppInstallation(appKey) {
+        //alert('refresh ' + appKey);
+        message = `REFRESH '${appKey}'\n\n` +
+        `Refreshing '${appKey}' needs to 'reset' its status to the state, as when it was last installed/cloned!\n\n` +
+        `That means that any changes in the 'app_path' (existing files edited or new files added) get lost, ` +
+        `including local model downloads into the various 'models' sub-folders of the app!\n\n` +
+        `Before the refreshing starts, the 'Refresh Symlinks' code will be called, to 'pull-back' any locally downloaded model files, ` +
+        `and save them into the 'shared_models' workspace folder, before the actual 'reset' is done.\n\n` +
+
+        `So this operation is not 'light' and you should plan for that accordingly!`;
+        message += '\n\n'; // add 2 lines after such  message and before the refresh confirm message
+
+        if (confirm(`${message}Are you sure you want to REFRESH the app '${appKey}'?\nThis may cause data loss!`)) {
+            try {
+                // Update status text
+                const statusDiv = document.querySelector(`#apps .app:has(#refresh-installation-${appKey}) .status`);
+                if (statusDiv) {
+                    statusDiv.textContent = 'Status: refreshing ...';
+                }
+                
+                const refreshAppButton = document.getElementById('refresh-installation-' + appKey);
                 let logsContainer = document.getElementById('install-logs-' + appKey);
-                
+        
                 // Create logs container if it doesn't exist
                 if (!logsContainer) {
                     logsContainer = document.createElement('div');
                     logsContainer.id = 'install-logs-' + appKey;
                     logsContainer.className = 'install-logs';
-                    fixButton.parentNode.insertBefore(logsContainer, fixButton.nextSibling);
+                    refreshAppButton.parentNode.insertBefore(logsContainer, refreshAppButton.nextSibling);
                 }
-                
-                fixButton.disabled = true;
+
+                refreshAppButton.disabled = true;
                 logsContainer.style.display = 'block';
-                appendToInstallLogs({app_name: appKey, log: "Starting to fix custom nodes..."});
+                appendToInstallLogs({app_name: appKey, log: "Starting to refresh app installation ..."});
+
+                const response = await fetch(`/refresh_installation/${appKey}`, { method: 'GET' });
+                const data = await response.json();
+
+                if (data.status === 'refreshed') {
+                    if (statusDiv) {
+                        statusDiv.textContent = 'Status: refreshed successfully';
+                    }
+                    //appendToInstallLogs({app_name: appKey, log: 'Success: ' + data.message});
+                    alert(data.message);
+                } else if (data.status === 'error') {
+                    if (statusDiv) {
+                        statusDiv.textContent = 'Status: refresh was unsuccessful!';
+                    }                
+                    appendToInstallLogs({app_name: appKey, log: 'Error: ' + data.message});
+                    alert(`Error refreshing '${appKey}': ${data.message}`);
+                }
+            } catch (error) {
+                console.error('Error refreshing app:', error);
+                appendToInstallLogs({app_name: appKey, log: 'Error: ' + error.message});
+                alert(`Error refreshing '${appKey}': ${error.message}`);
+            } finally {
+                refreshAppButton.disabled = false;
+            }
+        }
+    }
+
+    async function deleteAppInstallation(appKey, checkAppMessage) {
+        if (checkAppMessage != '') // if there is a informational message from a failed checkAppInstallation()
+            checkAppMessage += '\n\n';
+
+        message = `DELETE '${appKey}'\n\n` +
+        `Deleting '${appKey}' will remove the 'app_path', including local model downloads into the 'models sub-folders of the app!\n` +
+        `Before deleting, the 'Refresh Symlinks' code will be called to 'pull-back' any locally downloaded model files, ` +
+        `and save them into the 'shared_models' workspace folder, before the actual deletion is done.\n\n` +
+        
+        `So even when minimizing data loss, you should plan for that accordingly!`;        
+        message = checkAppMessage + message + '\n\n'; // add 2 lines after such  message and before the delete confirm message
+
+        if (confirm(`${message}Are you sure you want to DELETE the app '${appKey}'?\nThis may cause data loss!`)) {
+            try {
+                // Update status text
+                const statusDiv = document.querySelector(`#apps .app:has(#delete-installation-${appKey}) .status`);
+                if (statusDiv) {
+                    statusDiv.textContent = 'Status: deleting ...';
+                }                
+
+                const response = await fetch(`/delete_app/${appKey}`, { method: 'GET' });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                if (data.status === 'deleted') {
+                    if (statusDiv) {
+                        statusDiv.textContent = 'Status: deleted successfully';
+                    }
+                    // successfully deleted the app, show summary message
+                    alert(data.message);
+                    // refresh the page as app UI is now obsolate
+                    // remove hashtag url part, keep previous load in browser history (assign instead of replace)
+                    window.top.location.assign(window.top.location.href.split('#')[0]);
+                } else if (data.status === 'error') {
+                    if (statusDiv) {
+                        statusDiv.textContent = 'Status: delete was unsuccessful!';
+                    }
+                    alert(`Error deleting '${appKey}': ${data.message}`);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert(`Error deleting '${appKey}': ${error.message}`);
+            }
+        }
+    }
+
+    function showVenvChoiceDialog(appKey, available_venvs) {
+        const dialogContent = `
+            <h3>For '${appKey}' there are multiple virtual environments available. Please choose one:</h3>
+            <ul>
+                ${available_venvs.map((venv, index) => `
+                    <li>
+                        <button onclick="selectVenv('${appKey}', '${venv.version}')">
+                            '${venv.version}' version (Size: ${formatSize(venv.venv_uncompressed_size_kb * 1024)}) ${venv.download_url}<br>
+                            ${venv.notes}<br>
+                            ${venv.build_info}
+                        </button>
+                    </li>
+                `).join('')}
+            </ul>
+        `;
+        
+        showDialog(dialogContent);
+    }
+
+    function selectVenv(appKey, venvVersion) {
+        //alert('selected ' + venvVersion);
+        document.body.removeChild(document.body.lastChild); // Remove the dialog
+        //const modal = document.querySelector('.modal');
+        //document.body.removeChild(modal);
+
+        installApp(appKey, venvVersion);
+    }
+
+    function initializeUI() {
+        updateStatus();
+        // TODO: need a way this 2 functions not pollute the logs every second or 5 seconds
+        setInterval(updateStatus, 5000);
+        setInterval(updateLogs, 1000);
+
+        // Initialize model types
+        refreshModelTypes();
+    }
+
+    async function refreshModelTypes() {
+        var data = {};
+        data.cmd = 'refreshModelTypes';
+        await extendUIHelper(data); // lutzapps - initialize the available SHARED_MODEL_FOLDERS for the "Model Downloader" modelType select list
+    }
+
+    // lutzapps - populate modeltype select options from shared_models
+    async function extendUIHelper(data) {
+        // check the data
+        // if no data is passed, the default cmd is "selectModelType" with no specific "model_type",
+        // which means to re-select the last selected modelType option from the global var MODELTYPE_SELECTED
+        var cmd = "selectModelType"; // default cmd, when called with empty data or empty cmd
+        var model_type = MODELTYPE_SELECTED; // the 'modelType' option value (=foldername) for the select dropdown list
+        var token = ""; // the token value of HF_TOKEN or CIVITAI_API_TOKEN to pass to the corresponding WebUI Password fields on the "Models" tab
+
+        var response;
+        var result;
+
+        if (data !== undefined && data.cmd !== undefined) {
+            cmd = data.cmd;
+            if (cmd === "selectModelType" && data.model_type !== undefined) {
+                model_type = data.model_type; // the model_type which is passed in to select
+            }
+            if ((cmd === "hfToken" || cmd === "civitaiToken") // cmd need to match the DOM id of the Password field on the "Models" tab
+                && data.token !== undefined) {
+                token = data.token; // if token = undefined or empty "", then the corresponding token get fetched from the server
+            }
+        }
+
+        //alert("extendUIHelper(): cmd=" + cmd +", model_type=" + model_type + ", token=" + token); // debug-info (DISABLED)
+
+        switch (cmd) {
+            case "civitaiToken":
+                if (token === "") { // get the data from the Server
+                    response = await fetch('/get_civitai_token');
+                    result = await response.json();
+                    token = result['token'];
+                }
+
+                alert(cmd + "=" + token);
+                // pass tokens from HF or CIVITAI ENV vars into their Password fields
+                document.getElementById(cmd).value = token; //'********'; // indicate a found token, but require to call back
+
+                break;
+
+            case "hfToken":
+                if (token === "") { // get the data from the Server
+                    response = await fetch('/get_huggingface_token');
+                    result = await response.json();
+                    token = result['token'];
+                }
+            
+                alert(cmd + "=" + token);
+                // pass tokens from HF or CIVITAI ENV vars into their Password fields
+                document.getElementById(cmd).value = token; //'********'; // indicate a found token, but require to call back
+
+                break;
+
+            case "refreshModelTypes":
+                // refresh and optionally select the 'modelType' list for "Model Downloader"
+                var modelTypeSelect = document.getElementById('modelType');
+                if (!modelTypeSelect) {
+                    console.error('Model type select element not found');
+                    return;
+                }
 
                 try {
-                    const response = await fetch('/fix_custom_nodes/' + appKey, { method: 'POST' });
-                    const data = await response.json();
-                    if (data.status === 'success') {
-                        appendToInstallLogs({app_name: appKey, log: 'Success: ' + data.message});
+                    // get the data from the Server
+                    response = await fetch('/get_model_types');
+                    result = await response.json();
+
+                    var model_types = result; // get the JSON-Object
+                    var count = Object.keys(model_types).length;
+
+                    var modelTypeSelected = modelTypeSelect.value; // remember the current selected modelType.option value
+                    modelTypeSelect.options.length = 0; // clear all current modelTypeSelect options
+
+                    if (count === 0) {
+                        // Add a default option if no model types are available
+                        const defaultOption = document.createElement('option');
+                        defaultOption.text = 'Please create shared folders first';
+                        defaultOption.value = '';
+                        modelTypeSelect.add(defaultOption);
+                        return;
+                    }
+
+                    for (i = 0; i < count; i++) {
+                        modelTypeOption = document.createElement('option');
+                        modelType = model_types[String(i)]['modelfolder'];
+                        modelTypeOption.setAttribute('value', modelType);
+                        modelTypeOption.appendChild(document.createTextNode(model_types[String(i)]['desc']));
+                        modelTypeSelect.appendChild(modelTypeOption);
+                    }
+
+                    if (modelTypeSelected === "") {
+                        modelTypeSelect.selectedIndex = 0;
+                        MODELTYPE_SELECTED = modelTypeSelect.options[0].value;
                     } else {
-                        throw new Error(data.message);
+                        modelTypeSelect.value = modelTypeSelected;
+                        MODELTYPE_SELECTED = modelTypeSelected;
                     }
                 } catch (error) {
-                    console.error('Error fixing custom nodes:', error);
-                    appendToInstallLogs({app_name: appKey, log: 'Error: ' + error.message});
-                } finally {
-                    fixButton.disabled = false;
+                    console.error('Error refreshing model types:', error);
                 }
-            }
-         
-         // Poddy animation
-         const secretSequence = [38, 38, 40, 40, 37, 39, 37, 39, 66, 65];
-        let sequenceIndex = 0;
-        let lastKeyTime = 0;
-        let animationInterval;
-        let specialItemInterval;
-        let currentSpecialItem = '';
+                break;
 
-        document.addEventListener('keydown', (e) => {
-            const currentTime = new Date().getTime();
-            if (currentTime - lastKeyTime > 1000) {
-                sequenceIndex = 0;
-            }
-            lastKeyTime = currentTime;
+            case "selectModelType":
+                // this is called by model_utils:download_civitai_model() which passed the downloading 'model_type'
+                // to select for clarity, which can be different from the currently selected modelType option
+                // if called without a 'model_type', the last MODELTYPE_SELECTED will be selected (after a "Tab Switch")
 
-            if (e.keyCode === secretSequence[sequenceIndex]) {
-                sequenceIndex++;
-                if (sequenceIndex === secretSequence.length) {
-                    startPoddyAnimation();
-                    sequenceIndex = 0;
+                // refresh and optionally select the 'modelType' list for "Model Downloader"
+                var modelTypeSelect = document.getElementById('modelType');
+                modelTypeSelect.value = model_type;
+                MODELTYPE_SELECTED = model_type; // NOT handled by the onchange() event handler
+
+                break;
+
+            default: // no cmd passed is same as "selectModelType" without a 'model_type'
+                // this is already handled by "selectModelType" defaults, there is no "default" case needed here
+        }
+    }
+
+    async function downloadModel() {
+        const url = document.getElementById('modelUrl').value;
+        const modelName = document.getElementById('modelName').value;
+        const modelType = document.getElementById('modelType').value;
+        //const hfToken = document.getElementById('hfToken').value;
+        let hfToken = null;
+        let civitaiToken = null;
+
+        // lutzapps - support HF_TOKEN ENV var
+        // Check if the URL is from Huggingface
+        if (url.toLowerCase().includes('huggingface.co')) { // be case-insensitive with this url
+            hfToken = document.getElementById('hfToken').value;
+            if (hfToken === '********') {
+                // if the token is masked, fetch it from the server
+                const response = await fetch('/get_huggingface_token');
+                const result = await response.json();
+                hfToken = result.token;
+            }
+        }        
+        // Check if the URL is from Civitai
+        if (url.toLowerCase().includes('civitai.com')) { // lutzapps - be case-insensitive with this url
+            civitaiToken = document.getElementById('civitaiToken').value;
+            if (civitaiToken === '********') {
+                // If the token is masked, fetch it from the server
+                const response = await fetch('/get_civitai_token');
+                const result = await response.json();
+                civitaiToken = result.token;
+            }
+            
+            if (!civitaiToken) {
+                alert('Civitai API token is required for Civitai URLs. Please enter it in the Civitai API Token field.');
+                return;
+            }
+        }
+        
+        await startModelDownload(url, modelName, modelType, civitaiToken, hfToken);
+    }
+
+    async function startModelDownload(url, modelName, modelType, civitaiToken, hfToken, versionId = null, fileIndex = null) {
+        const progressBar = document.querySelector('#model-download-progress .progress-bar-fill');
+        const statusDiv = document.getElementById('model-download-status');
+        const speedDiv = document.getElementById('model-download-speed');
+        const etaDiv = document.getElementById('model-download-eta');
+
+        document.getElementById('model-download-progress').style.display = 'block';
+        progressBar.style.width = '0%';
+        progressBar.textContent = '0%';
+        statusDiv.textContent = 'Starting download...';
+        speedDiv.textContent = '';
+        etaDiv.textContent = '';
+
+        try {
+            const response = await fetch('/download_model', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    url, 
+                    model_name: modelName, 
+                    model_type: modelType,
+                    civitai_token: civitaiToken,
+                    hf_token: hfToken,
+                    version_id: versionId,
+                    file_index: fileIndex
+                }),
+            });
+
+            const result = await response.json();
+            if (result.status === 'success') {
+                statusDiv.textContent = result.message;
+                progressBar.style.width = '100%';
+                progressBar.textContent = '100%';
+                await loadModelFolders();
+                // showRecreateSymlinksButton(); // disable call since it's automatic now
+            } else if (result.status === 'choice_required') {
+                if (result.data.type === 'file') {
+                    showFileChoiceDialog(result.data, url, modelName, modelType, civitaiToken, hfToken);
+                } else if (result.data.type === 'version') {
+                    showVersionChoiceDialog(result.data, url, modelName, modelType, civitaiToken, hfToken);
                 }
             } else {
-                sequenceIndex = 0;
+                statusDiv.textContent = `Error: ${result.message}`;
             }
-        });
+        } catch (error) {
+            console.error('Error:', error);
+            statusDiv.textContent = `Error: ${error.message}`;
+        }
+    }
 
-        function startPoddyAnimation() {
-            const animationContainer = document.getElementById('poddy-animation');
-            const poddyContainer = document.getElementById('poddy-container');
-            const specialItem = document.getElementById('special-item');
-            const audio = document.getElementById('poddy-audio');
+    function showDialog(modalContent) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                ${modalContent}
+            </div>
+        `;
 
-            animationContainer.style.display = 'block';
-            audio.play();
+        document.body.appendChild(modal);
+        
+        modal.style.display = 'block';
+        
+        const closeBtn = modal.querySelector('.close');
+        closeBtn.onclick = function() {
+            document.body.removeChild(modal);
+            // refresh the page if user cancel and close the dialog without selecting a venv
+            // remove hashtag url part, keep previous load in browser history (assign instead of replace)
+            window.top.location.assign(window.top.location.href.split('#')[0]);
+        }
+        
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                document.body.removeChild(modal);
+            }
+        }    
+    }
 
-            let animationTime = 0;
-            const poddyInterval = 400; // 0.4 seconds between each Poddy spawn attempt
-            const mushroomDuration = 1200; // 1.2 seconds for mushroom display
-            const snakeDuration = 6000; // 6 seconds for snake animation
-            let poddies = [];
+    function showVersionChoiceDialog(data, url, modelName, modelType, civitaiToken, hfToken) {
+        const dialogContent = `
+            <h3>Multiple versions for this model available. Please choose one:</h3>
+            <ul>
+                ${data.versions.map((version, index) => `
+                    <li>
+                        <button onclick="selectVersion(${version.id}, '${url}', '${modelName}', '${modelType}', '${civitaiToken}', '${hfToken}')">
+                            ${version.baseModel} '${version.name}' (Created: ${new Date(version.createdAt).toLocaleString()})
+                        </button>
+                    </li>
+                `).join('')}
+            </ul>
+        `;
+        
+        showDialog(dialogContent);
+    }
 
-            const animationInterval = setInterval(() => {
-                animationTime += 100; // Increment by 100ms each interval
+    function showFileChoiceDialog(data, url, modelName, modelType, civitaiToken, hfToken) {
+        const dialogContent = `
+            <h3>Multiple files for this model available. Please choose one:</h3>
+            <ul>
+                ${data.files.map((file, index) => `
+                    <li>
+                        <button onclick="selectFile(${index}, '${url}', '${modelName}', '${modelType}', '${civitaiToken}', '${hfToken}', ${data.version_id})">
+                            ${file.name} (${formatSize(file.sizeKB * 1024)}, Type: ${file.type}, Format: ${file.format}, Size: ${file.size}, FP: ${file.fp})
+                        </button>
+                    </li>
+                `).join('')}
+            </ul>
+        `;
 
-                // Poddy animation
-                if (animationTime % poddyInterval === 0 && poddies.length < 15) {
-                    if (Math.random() < 0.7) { // 70% chance to spawn a new Poddy
-                        const poddy = document.createElement('div');
-                        poddy.className = 'poddy';
-                        poddy.style.left = `${Math.random() * 90}vw`;
-                        poddy.style.top = `${Math.random() * 90}vh`;
-                        poddyContainer.appendChild(poddy);
-                        poddy.style.animation = 'dance 0.6s infinite, wiggle 0.3s infinite';
-                        poddies.push(poddy);
-                    }
-                }
+        showDialog(dialogContent);
+    }
 
-                // Mushroom animation
-                if ([5000, 11000, 18000, 35000, 41000, 47000, 53000, 72000].includes(animationTime)) {
-                    poddies.forEach(poddy => poddyContainer.removeChild(poddy));
-                    poddies = [];
-                    specialItem.style.backgroundImage = "url('/static/mushroom.png')";
-                    specialItem.style.display = 'block';
-                    specialItem.style.left = '50%';
-                    specialItem.style.top = '50%';
-                    specialItem.style.transform = 'translate(-50%, -50%) scale(1)';
-                    setTimeout(() => {
-                        specialItem.style.transform = 'translate(-50%, -50%) scale(3)';
-                    }, 100);
-                    setTimeout(() => {
-                        specialItem.style.display = 'none';
-                        specialItem.style.transform = 'translate(-50%, -50%) scale(1)';
-                    }, mushroomDuration);
-                }
+    function selectVersion(versionId, url, modelName, modelType, civitaiToken, hfToken) {
+        document.body.removeChild(document.body.lastChild); // Remove the dialog
 
-                // Snake animation
-                if (animationTime === 24000 || animationTime === 60000) {
-                    poddies.forEach(poddy => poddyContainer.removeChild(poddy));
-                    poddies = [];
-                    specialItem.style.backgroundImage = "url('/static/snake.png')";
-                    specialItem.style.display = 'block';
-                    specialItem.style.left = '-30vw';
-                    specialItem.style.top = '50%';
-                    specialItem.style.transform = 'translateY(-50%)';
-                    specialItem.style.transition = `left ${snakeDuration/1000}s linear`;
-                    setTimeout(() => {
-                        specialItem.style.left = '100vw';
-                    }, 100);
-                    setTimeout(() => {
-                        specialItem.style.display = 'none';
-                        specialItem.style.transition = 'none';
-                        specialItem.style.left = '-30vw';
-                    }, snakeDuration);
-                }
+        startModelDownload(url, modelName, modelType, civitaiToken, hfToken, versionId);
+    }
 
-                if (animationTime >= 73000) { // End animation after 73 seconds (1:13)
-                    clearInterval(animationInterval);
-                    animationContainer.style.display = 'none';
-                    poddyContainer.innerHTML = '';
-                    specialItem.style.display = 'none';
-                    audio.pause();
-                    audio.currentTime = 0;
-                }
-            }, 100);
-        }       
+    function selectFile(fileIndex, url, modelName, modelType, civitaiToken, hfToken, versionId) {
+        document.body.removeChild(document.body.lastChild); // Remove the dialog
+        //const modal = document.querySelector('.modal');
+        //document.body.removeChild(modal);
+    
+        startModelDownload(url, modelName, modelType, civitaiToken, hfToken, versionId, fileIndex);
+    }
 
-        document.getElementById('downloadLogsBtn').addEventListener('click', () => {
-            if (currentLogApp && currentLogAppName) {
-                downloadLogs(currentLogApp, currentLogAppName);
+    async function loadModelFolders() {
+        try {
+            const response = await fetch('/get_model_folders');
+            const folders = await response.json();
+            const modelFoldersDiv = document.getElementById('model-folders');
+            modelFoldersDiv.innerHTML = '';
+
+            for (const [folderName, folderInfo] of Object.entries(folders)) {
+                const folderDiv = document.createElement('div');
+                folderDiv.className = 'model-folder';
+                folderDiv.innerHTML = `
+                    <h4>${folderName}</h4>
+                    <p>Size: ${folderInfo.size}</p>
+                    <p>Files: ${folderInfo.file_count}</p>
+                `;
+                modelFoldersDiv.appendChild(folderDiv);
+            }
+        } catch (error) {
+            console.error('Error loading model folders:', error);
+        }
+    }
+
+    // function showRecreateSymlinksButton() {
+    //     const buttonContainer = document.getElementById('recreate-symlinks-container');
+    //     buttonContainer.innerHTML = `
+    //         <button onclick="recreateSymlinks()" class="settings-button">Recreate Symlinks</button>
+    //         <p id="symlink-status"></p>
+    //     `;
+    //     buttonContainer.style.display = 'block';
+    // }
+
+    async function recreateSymlinks() {
+        const statusElement = document.getElementById('symlink-status');
+        statusElement.textContent = 'Recreating Symlinks ...';
+        try {
+            const response = await fetch('/recreate_symlinks', { method: 'GET' });
+            const data = await response.json();
+            if (data.status === 'success') {
+                statusElement.textContent = data.message;
             } else {
-                alert('Please select an app to view logs before downloading.');
+                statusElement.textContent = 'Error: ' + data.message;
             }
-        });
+        } catch (error) {
+            statusElement.textContent = 'Error: ' + error.message;
+        }
+    }
 
-        async function downloadLogs(appKey, appName) {
+    async function saveCivitaiToken() {
+        // Get token from the main Civitai token input field
+        const token = document.getElementById('civitaiToken').value;
+        if (!token) {
+            alert('Please enter a Civitai API token');
+            return;
+        }
+
+        try {
+            const response = await fetch('/save_civitai_token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token: token }),
+            });
+            const result = await response.json();
+            if (result.status === 'success') {
+                // Update both token fields to show it's saved
+                document.getElementById('civitaiToken').value = '********';
+                document.getElementById('civitaiTokenSave').value = '********';
+                alert('Civitai token saved successfully.');
+            } else {
+                alert(`Error: ${result.message}`);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert(`Error: ${error.message}`);
+        }
+    }
+
+    async function loadCivitaiToken() {
+        try {
+            const response = await fetch('/get_civitai_token');
+            const result = await response.json();
+            if (result.token) {
+                document.getElementById('civitaiToken').value = '********';
+                document.getElementById('civitaiTokenSave').value = '********';
+            }
+        } catch (error) {
+            console.error('Error loading Civitai token:', error);
+        }
+    }
+
+    // lutzapps - added HF_TOKEN support
+    async function loadHFToken() {
+        try {
+            const response = await fetch('/get_huggingface_token');
+            const result = await response.json();
+            if (result.token) {
+                document.getElementById('hfToken').value = '********';
+            }
+        } catch (error) {
+            console.error('Error loading Huggingface token:', error);
+        }
+    }
+
+    function formatSize(bytes) {
+        if (!bytes || isNaN(bytes)) return '0 B';
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), sizes.length - 1);
+        const size = bytes / Math.pow(1024, i);
+        return `${size.toFixed(2)} ${sizes[i]}`;
+    }
+
+    function formatTime(seconds) {
+        if (isNaN(seconds) || seconds < 0) {
+            return 'Calculating...';
+        }
+        if (seconds < 60) {
+            return `${seconds} seconds`;
+        } else if (seconds < 3600) {
+            return `${Math.floor(seconds / 60)} minutes ${seconds % 60} seconds`;
+        } else {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            return `${hours} hours ${minutes} minutes`;
+        }
+    }
+
+    // Example URLs - lutzapps - TODO: enrich data
+    const exampleUrls = {
+        'Stable-diffusion': 'https://civitai.com/models/90352/dreamshaper',
+        'Lora': 'https://civitai.com/models/58390?modelVersionId=62833',
+        'VAE': 'https://huggingface.co/stabilityai/sd-vae-ft-mse-original/blob/main/vae-ft-mse-840000-ema-pruned.safetensors',
+        'ESRGAN': 'https://civitai.com/models/116225?modelVersionId=125843',
+        'Flux-Dev': 'https://civitai.com/models/618692?modelVersionId=691639',
+        'Flux-Schnell': 'https://civitai.com/models/618692?modelVersionId=699279'
+    };
+
+    function updateExampleUrls() {
+        document.getElementById('example-sd').textContent = exampleUrls['Stable-diffusion'];
+        document.getElementById('example-lora').textContent = exampleUrls['Lora'];
+        document.getElementById('example-vae').textContent = exampleUrls['VAE'];
+        document.getElementById('example-upscaler').textContent = exampleUrls['ESRGAN'];
+        document.getElementById('example-flux-dev').textContent = exampleUrls['Flux-Dev'];
+        document.getElementById('example-flux-schnell').textContent = exampleUrls['Flux-Schnell'];
+    }
+
+    // lutzapps - replace function copyToClipboard() with function useInModelDownloader()
+    function useInModelDownloader(modelType, modelUrl) {
+        // copy the downloadUrl in the Model Downloader "Url" textbox
+        document.getElementById('modelUrl').value = modelUrl;
+
+        // select the modelType in the modelType select list, we are just about to download
+        var data = {};
+        data.cmd = 'selectModelType';
+        data.model_type = modelType;
+        extendUIHelper(data);
+
+        navigator.clipboard.writeText(modelUrl).then(() => {
+            alert('URL copied to Downloader and into the Clipboard!');
+        }, (err) => {
+            console.error('Could not copy text: ', err);
+        });
+    }
+
+    // Call this function when the Models tab is opened
+    document.querySelector('.navbar-tabs a[onclick="openTab(event, \'models-tab\')"]').addEventListener('click', function() {
+        loadModelFolders();
+        refreshModelTypes();  // Refresh model types when switching to Models tab
+        loadCivitaiToken();
+        loadHFToken();
+        updateExampleUrls();
+    });
+
+    // Initialize WebSocket connection
+    connectWebSocket();
+
+    // ... (keep any remaining code)
+
+    function openTab(evt, tabName) {
+        var i, tabContent, tabLinks;
+        tabContent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabContent.length; i++) {
+            tabContent[i].style.display = "none";
+        }
+        tabLinks = document.getElementsByClassName("tab-link");
+        for (i = 0; i < tabLinks.length; i++) {
+            tabLinks[i].className = tabLinks[i].className.replace(" active", "");
+        }
+        document.getElementById(tabName).style.display = "block";
+        evt.currentTarget.className += " active";
+
+        // Additional actions when switching tabs
+        if (tabName === 'apps-tab') {
+            document.querySelector('.logs-section').style.display = 'flex';
+            updateLogs(); // Refresh logs when switching back to the "Apps" tab
+        } else if (tabName === 'models-tab') {
+            // lutzapps - the following event handler functions already fired
+            // in the queryselector eventhandler (esspecially for the "models-tab" tab)
+            //loadModelFolders();
+            //loadCivitaiToken();
+            //loadHFToken(); // lutzapps - added HF_TOKEN Support
+        } else if (tabName === 'settings-tab') {
+            loadSshDetails();
+            // Remove updateFileBrowserStatus() from here
+        }
+    }
+
+    function loadSshDetails() {
+        const ip = '{{ RUNPOD_PUBLIC_IP }}';
+        const port = '{{ RUNPOD_TCP_PORT_22 }}';
+        const sshCommand = `ssh root@${ip} -p ${port}`;
+        document.getElementById('sshIp').textContent = ip;
+        document.getElementById('sshPort').textContent = port;
+        document.getElementById('sshCommand').textContent = sshCommand;
+
+        const newSshPassword = document.getElementById('newSshPassword');
+        const passwordButtons = document.querySelector('.password-buttons');
+        
+        if ('{{ ssh_password_status }}' === 'set') {
+            newSshPassword.placeholder = "Password is set (hidden)";
+            passwordButtons.style.display = 'flex';
+        } else {
+            newSshPassword.placeholder = "Enter new SSH password";
+            passwordButtons.style.display = 'flex';
+        }
+    }
+
+    // Add this at the end of your script section
+    document.addEventListener('DOMContentLoaded', function() {
+        loadSshDetails();
+        // ... any other initialization code ...
+    });
+
+    function copySshCommand() {
+        const sshCommand = document.getElementById('sshCommand').textContent;
+        navigator.clipboard.writeText(sshCommand).then(() => {
+            alert('SSH command copied to clipboard!');
+        }, (err) => {
+            console.error('Could not copy text: ', err);
+            alert('Failed to copy SSH command. Please copy it manually.');
+        });
+    }
+
+    function togglePasswordVisibility() {
+        const passwordInput = document.getElementById('newSshPassword');
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            if (passwordInput.placeholder === "Password is set (hidden)") {
+                passwordInput.value = "{{ ssh_password }}";
+            }
+            } else {
+            passwordInput.type = 'password';
+            if (passwordInput.value === "{{ ssh_password }}") {
+                passwordInput.value = '';
+                passwordInput.placeholder = "Password is set (hidden)";
+            }
+        }
+    }
+
+    async function setCustomSshPassword() {
+        const newPassword = document.getElementById('newSshPassword').value;
+        if (!newPassword) {
+            alert('Please enter a password.');
+            return;
+        }
+        
+        if (confirm('Warning: Password-based SSH authentication is less secure than key-based authentication.\nAre you sure you want to SET a password?')) {
             try {
-                const response = await fetch('/logs/' + appKey);
-                    const data = await response.json();
-                const logs = data.logs.join('\n');
-
-                const blob = new Blob([logs], { type: 'text/plain' });
-                const url = window.URL.createObjectURL(blob);
-
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = appName + '_logs.txt';
-                document.body.appendChild(a);
-                a.click();
-
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-                } catch (error) {
-                console.error('Error downloading logs:', error);
-                alert('An error occurred while downloading the logs. Please try again.');
+                const response = await fetch('/set_ssh_password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password: newPassword }),
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    alert('SSH password set successfully.');
+                    document.getElementById('newSshPassword').value = '';
+                    document.getElementById('newSshPassword').placeholder = 'Password is set (hidden)';
+                } else {
+                    alert('Failed to set SSH password: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error setting SSH password:', error);
+                alert('An error occurred while setting the SSH password.');
             }
         }
-        // Add a function to handle window resizing
-        function handleResize() {
-            const contentContainer = document.querySelector('.content-container');
-            const navbar = document.querySelector('.navbar');
-            const windowHeight = window.innerHeight;
-            const navbarHeight = navbar.offsetHeight;
-            contentContainer.style.height = `${windowHeight - navbarHeight}px`;
+    }
 
-            const appsSection = document.querySelector('.apps-section');
-            const logsSection = document.querySelector('.logs-section');
-            if (window.innerWidth <= 768) {
-                appsSection.style.height = `${(windowHeight - navbarHeight) / 2}px`;
-                logsSection.style.height = `${(windowHeight - navbarHeight) / 2}px`;
+    function openFileBrowser() {
+        const podId = '{{ pod_id }}';
+
+        // *** lutzapps - Change #5 - support to run locally
+        // NOTE: ` (back-ticks) are used here for template literals
+        var url = `https://${podId}-7222.proxy.runpod.net/fileapp/`; // need to be declared as var
+        if (`${enable_unsecure_localhost}` === 'True') {
+            url = `http://localhost:7222/fileapp/`; // remove runpod.net proxy
+            //alert(`FileBrowser URL=${url}`);
+        }
+
+        window.open(url, '_blank');
+    }
+
+    async function controlFileBrowser(action) {
+        try {
+            const response = await fetch(`/${action}_filebrowser`);
+            const result = await response.json();
+            if (result.status === 'started' || result.status === 'stopped') {
+                // Remove updateFileBrowserStatus() from here
+            }
+        } catch (error) {
+            console.error('Error controlling File Browser:', error);
+        }
+    }
+
+    // Reduce the frequency of status updates
+    // Remove this interval
+    // setInterval(updateFileBrowserStatus, 30000); // Check every 30 seconds instead of 5 seconds
+
+    // Update the DOMContentLoaded event listener
+    document.addEventListener('DOMContentLoaded', function() {
+        loadSshDetails();
+        // ... (other initialization code)
+    });
+
+    // Update the Settings tab click handler
+    document.querySelector('.navbar-tabs a[onclick="openTab(event, \'settings-tab\')"]').addEventListener('click', function() {
+        loadSshDetails();
+        // Remove updateFileBrowserStatus() from here
+    });
+
+    async function installApp(appKey, venvVersion) {
+        //alert('install ' + appKey + ' (' + venvVersion + ')');
+        const installButton = document.getElementById(`install-${appKey}`);
+        const progressContainer = document.getElementById(`install-progress-${appKey}`);
+        const logsContainer = document.getElementById(`install-logs-${appKey}`);
+
+        installButton.disabled = true;
+        progressContainer.style.display = 'block';
+        logsContainer.style.display = 'block';
+        logsContainer.textContent = '';
+
+        try {
+            if (venvVersion == 'undefined' || venvVersion == '') {
+                const response = await fetch(`/available_venvs/${appKey}`, { method: 'GET' });
+            
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.status == 'error') {
+                    throw new Error(data.error['message']);
+                }
+
+                availableVenvs = data.available_venvs;
+                if (availableVenvs.length == 1) // user already selected a version with app-specific ENV var or DEBUG_SETTINGS
+                    installApp(appKey, availableVenvs[0].version); // call ourself with the ONE pre-selection, no need to ask user again
+                else
+                    // show the Venv-Picker dialog so the user can choose which VENV to install for this app
+                    venvVersion = showVenvChoiceDialog(appKey, availableVenvs);
+                    // this will call-back here with a selected venvVersion
+
+                return; // not continue the flow from here
+            }
+
+            // here we have a user-selected venvVersion to install
+            const response = await fetch(`/install/${appKey}/${venvVersion}`, { method: 'GET' });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                const data = await response.json();
+                if (data.status !== 'success') {
+                    throw new Error(data.message);
+                }
             } else {
-                appsSection.style.height = `${windowHeight - navbarHeight}px`;
-                logsSection.style.height = `${windowHeight - navbarHeight}px`;
+                throw new Error("Received non-JSON response from server");
             }
+
+            // Don't reload the page here, wait for the WebSocket 'install_complete' message
+        } catch (error) {
+            console.error('Installation error:', error);
+            appendToInstallLogs({app_name: appKey, log: `Error: ${error.message}`});
+        }
+    // Don't re-enable the button here, it will be handled by the WebSocket messages
+    }
+
+    // Update the WebSocket message handler
+    socket.onmessage = function(event) {
+        try {
+            const data = JSON.parse(event.data);
+            console.log("WebSocket message received:", data);
+
+            if (data.type === 'heartbeat') {
+                // Reset heartbeat timeout on receiving heartbeat response
+                resetHeartbeatTimeout();
+            } else if (data.type === 'install_progress') {
+                updateInstallProgress(data.data);
+            } else if (data.type === 'install_log') {
+                appendToInstallLogs(data.data);
+            } else if (data.type === 'model_download_progress') {
+                updateModelDownloadProgress(data.data);
+            } else if (data.type === 'status_update') {
+                updateAppStatus(data.data);
+            // lutzapps - use the extendUIHelper to "bridge" certain extensions between Python and JavaScript
+            } else if (data.type === 'extend_ui_helper') {
+                extendUIHelper(data.data);
+            }
+            // Handle other message types as needed
+        } catch (error) {
+            console.error('Error parsing WebSocket message:', error, 'Raw message:', event.data);
+        }
+    };
+
+    function updateInstallProgress(data) {
+        const progressContainer = document.getElementById(`install-progress-${data.app_name}`);
+        const downloadProgress = progressContainer.querySelector('.download-progress');
+        const unpackProgress = progressContainer.querySelector('.unpack-progress');
+        const cloneProgress = progressContainer.querySelector('.clone-progress');
+        const speedDisplay = progressContainer.querySelector('.download-speed');
+        const etaDisplay = progressContainer.querySelector('.download-eta');
+        const stageDisplay = progressContainer.querySelector('.install-stage');
+        
+        progressContainer.style.display = 'block';
+        
+        if (data.stage === 'Downloading') {
+            downloadProgress.style.width = `${data.percentage}%`;
+            downloadProgress.textContent = `${data.percentage.toFixed(0)}%`;
+            speedDisplay.textContent = `Speed: ${data.speed}`;
+            etaDisplay.textContent = `ETA: ${formatTime(parseInt(data.eta))}`;
+        } else if (data.stage === 'Unpacking') {
+            unpackProgress.style.width = `${data.percentage}%`;
+            unpackProgress.textContent = `${data.percentage.toFixed(0)}%`;
+            speedDisplay.textContent = `Processing: ${data.processed}`;
+            etaDisplay.textContent = '';
+        } else if (data.stage === 'Cloning') {
+            cloneProgress.style.width = `${data.percentage}%`;
+            cloneProgress.textContent = `${data.percentage.toFixed(0)}%`;
+            speedDisplay.textContent = `Processing: ${data.processed}`;
+            etaDisplay.textContent = '';
+        } else if (data.stage === 'Download Complete') {
+            downloadProgress.style.width = '100%';
+            downloadProgress.textContent = '100%';
+            speedDisplay.textContent = '';
+            etaDisplay.textContent = '';
+        } else if (data.stage === 'Unpacking Complete') {
+            unpackProgress.style.width = '100%';
+            unpackProgress.textContent = '100%';
+            speedDisplay.textContent = '';
+            etaDisplay.textContent = '';
+        } else if (data.stage === 'Cloning Complete') {
+            cloneProgress.style.width = '100%';
+            cloneProgress.textContent = '100%';
+            speedDisplay.textContent = '';
+            etaDisplay.textContent = '';
         }
 
-        // Call handleResize on page load and window resize
-        window.addEventListener('load', handleResize);
-        window.addEventListener('resize', handleResize);
+        stageDisplay.textContent = `Stage: ${data.stage}`;
+    }
+
+    function formatTime(seconds) {
+        if (seconds < 60) {
+            return `${seconds} seconds`;
+        } else if (seconds < 3600) {
+            return `${Math.floor(seconds / 60)} minutes ${seconds % 60} seconds`;
+        } else {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            return `${hours} hours ${minutes} minutes`;
+        }
+    }
+
+    function appendToInstallLogs(data) {
+        const logsContainer = document.getElementById(`install-logs-${data.app_name}`);
+        const logEntry = document.createElement('div');
+
+        logEntry.textContent = data.log;
+        logsContainer.appendChild(logEntry);
+        logsContainer.scrollTop = logsContainer.scrollHeight;
+    }
+
+    function handleInstallComplete(data) {
+        const installButton = document.getElementById(`install-${data.app_name}`);
+        if (data.status === 'success') {
+            console.log(data.message);
+            location.reload();  // Reload the page to reflect the new installation status
+        } else {
+            console.error(`Installation failed: ${data.message}`);
+        installButton.disabled = false;  // Re-enable the button only on failure
+        }
+    }
+
+    async function fixCustomNodes(appKey) {
+        const fixButton = document.getElementById('fix-custom-nodes-' + appKey);
+        let logsContainer = document.getElementById('install-logs-' + appKey);
+        
+        // Create logs container if it doesn't exist
+        if (!logsContainer) {
+            logsContainer = document.createElement('div');
+            logsContainer.id = 'install-logs-' + appKey;
+            logsContainer.className = 'install-logs';
+            fixButton.parentNode.insertBefore(logsContainer, fixButton.nextSibling);
+        }
+        
+        fixButton.disabled = true;
+        logsContainer.style.display = 'block';
+        appendToInstallLogs({app_name: appKey, log: "Starting to fix custom nodes ..."});
+
+        try {
+            const response = await fetch('/fix_custom_nodes/' + appKey, { method: 'GET' });
+            const data = await response.json();
+            if (data.status === 'success') {
+                appendToInstallLogs({app_name: appKey, log: 'Success: ' + data.message});
+            } else {
+                throw new Error(data.message);
+            }
+        } catch (error) {
+            console.error('Error fixing custom nodes:', error);
+            appendToInstallLogs({app_name: appKey, log: 'Error: ' + error.message});
+        } finally {
+            fixButton.disabled = false;
+        }
+    }
+        
+    // Poddy animation
+    const secretSequence = [38, 38, 40, 40, 37, 39, 37, 39, 66, 65];
+    let sequenceIndex = 0;
+    let lastKeyTime = 0;
+    let animationInterval;
+    let specialItemInterval;
+    let currentSpecialItem = '';
+
+    document.addEventListener('keydown', (e) => {
+        const currentTime = new Date().getTime();
+        if (currentTime - lastKeyTime > 1000) {
+            sequenceIndex = 0;
+        }
+        lastKeyTime = currentTime;
+
+        if (e.keyCode === secretSequence[sequenceIndex]) {
+            sequenceIndex++;
+            if (sequenceIndex === secretSequence.length) {
+                startPoddyAnimation();
+                sequenceIndex = 0;
+            }
+        } else {
+            sequenceIndex = 0;
+        }
+    });
+
+    function startPoddyAnimation() {
+        const animationContainer = document.getElementById('poddy-animation');
+        const poddyContainer = document.getElementById('poddy-container');
+        const specialItem = document.getElementById('special-item');
+        const audio = document.getElementById('poddy-audio');
+
+        animationContainer.style.display = 'block';
+        audio.play();
+
+        let animationTime = 0;
+        const poddyInterval = 400; // 0.4 seconds between each Poddy spawn attempt
+        const mushroomDuration = 1200; // 1.2 seconds for mushroom display
+        const snakeDuration = 6000; // 6 seconds for snake animation
+        let poddies = [];
+
+        const animationInterval = setInterval(() => {
+            animationTime += 100; // Increment by 100ms each interval
+
+            // Poddy animation
+            if (animationTime % poddyInterval === 0 && poddies.length < 15) {
+                if (Math.random() < 0.7) { // 70% chance to spawn a new Poddy
+                    const poddy = document.createElement('div');
+                    poddy.className = 'poddy';
+                    poddy.style.left = `${Math.random() * 90}vw`;
+                    poddy.style.top = `${Math.random() * 90}vh`;
+                    poddyContainer.appendChild(poddy);
+                    poddy.style.animation = 'dance 0.6s infinite, wiggle 0.3s infinite';
+                    poddies.push(poddy);
+                }
+            }
+
+            // Mushroom animation
+            if ([5000, 11000, 18000, 35000, 41000, 47000, 53000, 72000].includes(animationTime)) {
+                poddies.forEach(poddy => poddyContainer.removeChild(poddy));
+                poddies = [];
+                specialItem.style.backgroundImage = "url('/static/mushroom.png')";
+                specialItem.style.display = 'block';
+                specialItem.style.left = '50%';
+                specialItem.style.top = '50%';
+                specialItem.style.transform = 'translate(-50%, -50%) scale(1)';
+                setTimeout(() => {
+                    specialItem.style.transform = 'translate(-50%, -50%) scale(3)';
+                }, 100);
+                setTimeout(() => {
+                    specialItem.style.display = 'none';
+                    specialItem.style.transform = 'translate(-50%, -50%) scale(1)';
+                }, mushroomDuration);
+            }
+
+            // Snake animation
+            if (animationTime === 24000 || animationTime === 60000) {
+                poddies.forEach(poddy => poddyContainer.removeChild(poddy));
+                poddies = [];
+                specialItem.style.backgroundImage = "url('/static/snake.png')";
+                specialItem.style.display = 'block';
+                specialItem.style.left = '-30vw';
+                specialItem.style.top = '50%';
+                specialItem.style.transform = 'translateY(-50%)';
+                specialItem.style.transition = `left ${snakeDuration/1000}s linear`;
+                setTimeout(() => {
+                    specialItem.style.left = '100vw';
+                }, 100);
+                setTimeout(() => {
+                    specialItem.style.display = 'none';
+                    specialItem.style.transition = 'none';
+                    specialItem.style.left = '-30vw';
+                }, snakeDuration);
+            }
+
+            if (animationTime >= 73000) { // End animation after 73 seconds (1:13)
+                clearInterval(animationInterval);
+                animationContainer.style.display = 'none';
+                poddyContainer.innerHTML = '';
+                specialItem.style.display = 'none';
+                audio.pause();
+                audio.currentTime = 0;
+            }
+        }, 100);
+    }       
+
+    document.getElementById('downloadLogsBtn').addEventListener('click', () => {
+        if (currentLogApp && currentLogAppName) {
+            downloadLogs(currentLogApp, currentLogAppName);
+        } else {
+            alert('Please select an app to view logs before downloading.');
+        }
+    });
+
+    async function downloadLogs(appKey, appName) {
+        try {
+            const response = await fetch('/logs/' + appKey);
+                const data = await response.json();
+            const logs = data.logs.join('\n');
+
+            const blob = new Blob([logs], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = appName + '_logs.txt';
+            document.body.appendChild(a);
+            a.click();
+
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            } catch (error) {
+            console.error('Error downloading logs:', error);
+            alert('An error occurred while downloading the logs. Please try again.');
+        }
+    }
+
+    // Add a function to handle window resizing
+    function handleResize() {
+        const contentContainer = document.querySelector('.content-container');
+        const navbar = document.querySelector('.navbar');
+        const windowHeight = window.innerHeight;
+        const navbarHeight = navbar.offsetHeight;
+        contentContainer.style.height = `${windowHeight - navbarHeight}px`;
+
+        const appsSection = document.querySelector('.apps-section');
+        const logsSection = document.querySelector('.logs-section');
+        if (window.innerWidth <= 768) {
+            appsSection.style.height = `${(windowHeight - navbarHeight) / 2}px`;
+            logsSection.style.height = `${(windowHeight - navbarHeight) / 2}px`;
+        } else {
+            appsSection.style.height = `${windowHeight - navbarHeight}px`;
+            logsSection.style.height = `${windowHeight - navbarHeight}px`;
+        }
+    }
+
+    // Call handleResize on page load and window resize
+    window.addEventListener('load', handleResize);
+    window.addEventListener('resize', handleResize);
 
     async function createSharedFolders() {
         const statusElement = document.getElementById('shared-folders-status');
-        statusElement.textContent = 'Creating shared folders...';
+        statusElement.textContent = 'Creating shared folders ...';
         try {
-            const response = await fetch('/create_shared_folders', { method: 'POST' });
+            const response = await fetch('/create_shared_folders', { method: 'GET' });
             const data = await response.json();
             if (data.status === 'success') {
                 statusElement.textContent = data.message;

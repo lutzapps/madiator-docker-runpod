@@ -8,120 +8,6 @@ from flask import jsonify
 from utils.websocket_utils import (send_websocket_message, active_websockets)
 from utils.app_configs import (get_app_configs, load_global_dict_from_file, pretty_dict)
 
-### shared_models-v0.9.2 by lutzapps, Nov 5th 2024 ###
-
-# to run (and optionally DEBUG) this docker image "better-ai-launcher" in a local container on your own machine
-# you need to define the ENV var "LOCAL_DEBUG" in the "VSCode Docker Extension"
-# file ".vscode/tasks.json" in the ENV settings of the "dockerRun" section (or any other way),
-# and pass into the docker container:
-# tasks.json:
-# ...
-# "dockerRun": {
-# 	"containerName": "madiator2011-better-launcher", // no "/" allowed here for container name
-# 	"image": "madiator2011/better-launcher:dev",
-# 	"envFiles": ["${workspaceFolder}/.env"], // pass additional env-vars (hf_token, civitai token, ssh public-key) from ".env" file to container
-# 	"env": { // this ENV vars go into the docker container to support local debugging
-# 		"LOCAL_DEBUG": "True", // change app to localhost Urls and local Websockets (unsecured)
-# 		"FLASK_APP": "app/app.py",
-# 		"FLASK_ENV": "development", // changed from "production"
-# 		"GEVENT_SUPPORT": "True" // gevent monkey-patching is being used, enable gevent support in the debugger
-# 		// "FLASK_DEBUG": "0"  // "1" allows debugging in Chrome, but then VSCode debugger not works
-# 	},
-# 	"volumes": [
-# 		{
-# 		  "containerPath": "/app",
-# 		  "localPath": "${workspaceFolder}" // the "/app" folder (and sub-folders) will be mapped locally for debugging and hot-reload
-# 		},
-# 		{
-# 			"containerPath": "/workspace",
-# 			// TODO: create this folder before you run!
-# 			"localPath": "${userHome}/Projects/Docker/Madiator/workspace"
-# 		}
-# 	],
-# 	"ports": [
-# 	  {
-# 		"containerPort": 7222, // main Flask app port "AppManager"
-# 		"hostPort": 7222
-# 	  },
-# ...
-#
-#
-# NOTE: to use the "LOCAL_DEBUG" ENV var just for local consumption of this image, you can run it like
-#
-# docker run -it -d --name madiator-better-launcher -p 22:22 -p 7777:7777 -p 7222:7222 -p 3000:3000 -p 7862:7862 -p 7863:7863
-#  -e LOCAL_DEBUG="True" -e RUNPOD_PUBLIC_IP="127.0.0.1" -e RUNPOD_TCP_PORT_22="22"
-#  -e PUBLIC_KEY="ssh-ed25519 XXXXXXX...XXXXX user@machine-DNS.local"
-#  --mount type=bind,source=/Users/test/Projects/Docker/madiator/workspace,target=/workspace 
-#  madiator2011/better-launcher:dev
-#
-# To run the full 'app.py' / 'index.html' webserver locally, is was needed to "patch" the
-# '/app/app.py' main application file and the
-# '/app/templates/index.html'file according to the "LOCAL_DEBUG" ENV var,
-# to switch the CF "proxy.runpod.net" Url for DEBUG:
-#
-### '/app/app.py' CHANGES ###:
-# # lutzapps - CHANGE #1
-# LOCAL_DEBUG = os.environ.get('LOCAL_DEBUG', 'False') # support local browsing for development/debugging
-# ...
-# filebrowser_status = get_filebrowser_status()
-# return render_template('index.html', 
-#                        apps=app_configs, 
-#                        app_status=app_status, 
-#                        pod_id=RUNPOD_POD_ID, 
-#                        RUNPOD_PUBLIC_IP=os.environ.get('RUNPOD_PUBLIC_IP'),
-#                        RUNPOD_TCP_PORT_22=os.environ.get('RUNPOD_TCP_PORT_22'),
-#                        # lutzapps - CHANGE #2 - allow localhost Url for unsecure "http" and "ws" WebSockets protocol,
-# according to LOCAL_DEBUG ENV var (used 3x in "index.html" changes)
-#                        enable_unsecure_localhost=os.environ.get('LOCAL_DEBUG'),
-#                        ...
-# other (non-related) app.py changes omitted here
-#
-### '/app/template/index.html' CHANGES ###:
-#     <script>
-#     ...
-#     // *** lutzapps - Change #2 - support to run locally at http://localhost:${WS_PORT} (3 locations in "index.html")
-#     const enable_unsecure_localhost = '{{ enable_unsecure_localhost }}';
-#
-#     // default is to use the "production" WeckSockets CloudFlare URL
-#     // NOTE: ` (back-ticks) are used here for template literals
-#     var WS_URL = `wss://${podId}-${WS_PORT}.proxy.runpod.net/ws`; // need to be declared as var
-#
-#     if `${enable_unsecure_localhost}` === 'True') { // value of LOCAL_DEBUG ENV var
-#       // make sure to use "ws" Protocol (insecure) instead of "wss" (WebSockets Secure) for localhost,
-#       // otherwise you will get the 'loadingOverlay' stay and stays on screen with ERROR:
-#       // "WebSocket disconnected. Attempting to reconnect..." blocking the webpage http://localhost:7222
-#       WS_URL = `ws://localhost:${WS_PORT}/ws`; // localhost WS (unsecured)
-#       //alert(`Running locally with WS_URL=${WS_URL}`);
-#     }
-#     ...
-#     function openApp(appKey, port) {
-#       // *** lutzapps - Change #3 - support to run locally
-#       // NOTE: ` (back-ticks) are used here for template literals
-#       var url = `https://${podId}-${port}.proxy.runpod.net/`; // need to be declared as var
-#       if `${enable_unsecure_localhost}` === 'True') {
-#           url = `http://localhost:${port}/`; // remove runpod.net proxy
-#           //alert(`openApp URL=${url}`);
-#       }
-#
-#       window.open(url, '_blank');
-#     }
-#     ...
-#     function openFileBrowser() {
-#       const podId = '{{ pod_id }}';
-#
-#       // *** lutzapps - Change #5 - support to run locally
-#       // NOTE: ` (back-ticks) are used here for template literals
-#       var url = `https://${podId}-7222.proxy.runpod.net/fileapp/`; // need to be declared as var
-#       if `${enable_unsecure_localhost}` === 'True') {
-#           url = `http://localhost:7222/fileapp/`; // remove runpod.net proxy
-#           //alert(`FileBrowser URL=${url}`);
-#       }
-#
-#       window.open(url, '_blank');
-#     }
-# other (non-related) index.html changes omitted here
-
-
 README_FILE_PREFIX = "_readme-" # prefix for all different dynamically generated README file names
 
 ### support local docker container runs with locally BOUND Workspace, needed also during local debugging
@@ -313,7 +199,6 @@ APP_INSTALL_DIRS = {
 # }
 
 # MAP between Madiator's "app_configs" dict and the "APP_INSTALL_DIRS" dict used in this module
-# TODO: this is temporary and should be merged/integrated better later
 MAP_APPS = {
     "bcomfy": "ComfyUI",
     "bforge": "Forge",
@@ -322,7 +207,6 @@ MAP_APPS = {
 }
 
 # helper function called by main(), uses above "MAP_APPS" dict
-# TODO: this is temporary and should be merged/integrated better later
 def sync_with_app_configs_install_dirs():
     print(f"Syncing 'app_configs' dict 'app_path' into the 'APP_INSTALL_DIRS' dict ...")
 
@@ -528,7 +412,7 @@ def remove_broken_model_symlinks(shared_model_folderpath:str, app_model_folderpa
         if os.path.islink(app_model_filepath) and not os.path.exists(app_model_filepath):
             # Remove existing stale/broken symlink
             broken_modellinks_count = broken_modellinks_count + 1
-            dateInfo = "{:%B %d, %Y, %H:%M:%S GMT}".format(datetime.datetime.now())
+            dateInfo = "{:%b %d, %Y, %H:%M:%S GMT}".format(datetime.datetime.now())
             broken_modellinks_info += f"\t{app_model_filename}\t[@ {dateInfo}]\n"
 
             os.unlink(app_model_filepath) # try to unlink the file/folder symlink
@@ -575,8 +459,8 @@ def pull_unlinked_models_back_as_shared_models(shared_model_folderpath:str, app_
             continue # skip hidden filenames like ".DS_Store" (on macOS), ".keep" (on GitHub) and all "{README_FILE_PREFIX}*.txt" files
         
         app_model_filepath = os.path.join(app_model_folderpath, app_model_filename)
-        if os.path.islink(app_model_filepath) or os.path.isdir(app_model_filepath):
-            continue # skip all already symlinked model files and sub-folders
+        if os.path.islink(app_model_filepath) or os.path.isdir(app_model_filepath) or os.path.getsize(app_model_filepath) == 0:
+            continue # skip all already symlinked model files and sub-folders and ZERO size "put yout model here" files
 
         # real file, potentially a model file which can be pulled back "home"
         pulled_model_files_count = pulled_model_files_count + 1
@@ -587,7 +471,7 @@ def pull_unlinked_models_back_as_shared_models(shared_model_folderpath:str, app_
         
         print(f"\tpulled-back local model '{app_model_filepath}'")
 
-        dateInfo = "{:%B %d, %Y, %H:%M:%S GMT}".format(datetime.datetime.now())
+        dateInfo = "{:%b %d, %Y, %H:%M:%S GMT}".format(datetime.datetime.now())
         pulled_model_files_info += f"\t{app_model_filename}\t[@ {dateInfo}]\n"
         
         ### and re-link it back to this folder where it got just pulled back
@@ -626,9 +510,18 @@ def create_model_symlinks(shared_model_folderpath:str, app_model_folderpath:str,
     file_symlinks_created_count = 0
 
     for shared_model_filename in os.listdir(shared_model_folderpath):
+        # delete hidden huggingface ".cache" directories in each model directory, as they can exist
+        # from possible prior huggingface model downloads.
+        # this is a fragment from the hugginface_hub, and can be safely deleted
+        shared_model_filepath = os.path.join(shared_model_folderpath, shared_model_filename)
+        if shared_model_filename.startswith(".cache") and not os.path.isfile(shared_model_filepath): # hidden ".cache" folder
+            shutil.rmtree(shared_model_filepath) # remove the hidden ".cache" huggingface folder
+            print(f"Deleted hidden huggingface .cache folder '{shared_model_filepath}")
+            continue
+
         if shared_model_filename.startswith("."):
             continue # skip hidden filenames like ".DS_Store" (on macOS), ".keep" (on GitHub)
-        
+
         # change the "readme-*.txt" files for the symlinked app folder models
         if shared_model_filename.startswith(README_FILE_PREFIX):
             # create a new readme file for the app_model_folderpath target folder
@@ -640,11 +533,16 @@ def create_model_symlinks(shared_model_folderpath:str, app_model_folderpath:str,
 
             continue # skip the original "{README_FILE_PREFIX}*.txt" file
 
-        print(f"\tprocessing shared '{model_type}' model '{shared_model_filename}' ...")
         # get the full path from shared model filename
         src_filepath = os.path.join(shared_model_folderpath, shared_model_filename)
         dst_filepath = os.path.join(app_model_folderpath, shared_model_filename) # the dst_filepath always has the SAME filename as the src_filepath
-            
+
+        # skip the small dummy files and not treat them as models
+        if os.path.getsize(src_filepath) < 100:
+            continue # ZERO (or up to 99 Bytes) sized "put yout model here" files
+
+        print(f"\tprocessing shared '{model_type}' model '{shared_model_filename}' ...")
+
         if not os.path.isfile(src_filepath): # srcFile is a sub-folder (e.g. "xlabs", or "flux")
             # skip sub-folders, as these require a separate mapping rule to support "flattening" such models
             # for apps which don't find their model_type models in sub-folders
@@ -698,7 +596,7 @@ def create_model_symlinks(shared_model_folderpath:str, app_model_folderpath:str,
 #
 # SHARED_MODEL_APP_MAP_FILE (str): "_shared_models_map.json" (based in SHARED_MODELS_DIR)
 # SHARED_MODEL_APP_MAP (dict) <- init from code, then write/read from path SHARED_MODEL_FOLDERS_FILE
-def update_model_symlinks() -> dict:
+def update_model_symlinks():# -> dict:
     try:
         print(f"Processing the master SHARED_MODELS_DIR: {SHARED_MODELS_DIR}")
         if not os.path.exists(SHARED_MODELS_DIR):

@@ -6,22 +6,28 @@ import threading
 import time
 from flask import Flask, render_template, jsonify, request
 from flask_sock import Sock
+import re
 import json
 import signal
 import shutil
 import subprocess
 import traceback
+import logging
 
 from utils.ssh_utils import setup_ssh, save_ssh_password, get_ssh_password, check_ssh_config, SSH_CONFIG_FILE
 from utils.filebrowser_utils import configure_filebrowser, start_filebrowser, stop_filebrowser, get_filebrowser_status, FILEBROWSER_PORT
 from utils.app_utils import (
-    run_app, update_process_status, check_app_directories, get_app_status,
-    force_kill_process_by_name, update_webui_user_sh, save_install_status,
-    get_install_status, download_and_unpack_venv, fix_custom_nodes, is_process_running, install_app, # update_model_symlinks
-    get_bkohya_launch_url # lutzapps - support dynamic generated gradio url
+    run_app, run_bash_cmd, update_process_status, check_app_directories, get_app_status,
+    force_kill_process_by_name, find_and_kill_process_by_port, update_webui_user_sh,
+    fix_custom_nodes, is_process_running, install_app,
+    get_available_venvs, get_bkohya_launch_url, init_app_status, # lutzapps - support dynamic generated gradio url and venv_size checks
+    delete_app_installation, check_app_installation, refresh_app_installation # lutzapps - new app features for check and refresh app
 )
+from utils.websocket_utils import send_websocket_message, active_websockets
+from utils.app_configs import get_app_configs, add_app_config, remove_app_config, app_configs, DEBUG_SETTINGS, APP_CONFIGS_MANIFEST_URL
+from utils.model_utils import download_model, check_civitai_url, check_huggingface_url, format_size #, SHARED_MODELS_DIR # lutzapps - SHARED_MODELS_DIR is owned by shared_models module now
 
-# lutzapps - CHANGE #1
+# lutzapps
 LOCAL_DEBUG = os.environ.get('LOCAL_DEBUG', 'False') # support local browsing for development/debugging
 
 # use the new "utils.shared_models" module for app model sharing
@@ -55,10 +61,18 @@ from utils.shared_models import (
 #   global module 'SHARED_MODEL_APP_MAP' dict: 'model_type' -> 'app_name:app_model_dir' (relative path)
 # which does a default mapping from app code or (if exists) from external JSON 'SHARED_MODEL_APP_MAP_FILE' file
 
+"""
+from flask import Flask
+import logging
 
-from utils.websocket_utils import send_websocket_message, active_websockets
-from utils.app_configs import get_app_configs, add_app_config, remove_app_config, app_configs
-from utils.model_utils import download_model, check_civitai_url, check_huggingface_url, format_size #, SHARED_MODELS_DIR # lutzapps - SHARED_MODELS_DIR is owned by shared_models module now
+logging.basicConfig(filename='record.log', level=logging.DEBUG)
+app = Flask(__name__)
+
+if __name__ == '__main__':
+    app.run(debug=True)
+"""
+
+#logging.basicConfig(filename='better-ai-launcher.log', level=logging.INFO) # CRITICAL, ERROR, WARNING, INFO, DEBUG
 
 app = Flask(__name__)
 sock = Sock(app)
@@ -68,8 +82,6 @@ RUNPOD_POD_ID = os.environ.get('RUNPOD_POD_ID', 'localhost')
 running_processes = {}
 
 app_configs = get_app_configs()
-
-#S3_BASE_URL = "https://better.s3.madiator.com/" # unused now
 
 SETTINGS_FILE = '/workspace/.app_settings.json'
 
@@ -108,35 +120,26 @@ def index():
     ssh_password = get_ssh_password()
     ssh_password_status = 'set' if ssh_password else 'not_set'
 
-    app_status = {}
-    for app_name, config in app_configs.items():
-        dirs_ok, message = check_app_directories(app_name, app_configs)
-        status = get_app_status(app_name, running_processes)
-        install_status = get_install_status(app_name)
-        app_status[app_name] = {
-            'name': config['name'],
-            'dirs_ok': dirs_ok,
-            'message': message,
-            'port': config['port'],
-            'status': status,
-            'installed': dirs_ok,
-            'install_status': install_status,
-            'is_bcomfy': app_name == 'bcomfy'
-        }
-
     filebrowser_status = get_filebrowser_status()
+    app_status = init_app_status(running_processes)
+
     return render_template('index.html', 
-                         apps=app_configs, 
-                         app_status=app_status, 
-                         pod_id=RUNPOD_POD_ID, 
-                         RUNPOD_PUBLIC_IP=os.environ.get('RUNPOD_PUBLIC_IP'),
-                         RUNPOD_TCP_PORT_22=os.environ.get('RUNPOD_TCP_PORT_22'),
-                         enable_unsecure_localhost=os.environ.get('LOCAL_DEBUG'),
-                         settings=settings,
-                         current_auth_method=current_auth_method,
-                         ssh_password=ssh_password,
-                         ssh_password_status=ssh_password_status,
-                         filebrowser_status=filebrowser_status)
+                           apps=app_configs, 
+                           app_status=app_status, 
+                           pod_id=RUNPOD_POD_ID, 
+                           RUNPOD_PUBLIC_IP=os.environ.get('RUNPOD_PUBLIC_IP'),
+                           RUNPOD_TCP_PORT_22=os.environ.get('RUNPOD_TCP_PORT_22'),
+
+ # lutzapps - allow localhost Url for unsecure "http" and "ws" WebSockets protocol,
+ # according to 'LOCAL_DEBUG' ENV var
+                           enable_unsecure_localhost=os.environ.get('LOCAL_DEBUG'),
+                           app_configs_manifest_url=APP_CONFIGS_MANIFEST_URL,
+
+                           settings=settings,
+                           current_auth_method=current_auth_method,
+                           ssh_password=ssh_password,
+                           ssh_password_status=ssh_password_status,
+                           filebrowser_status=filebrowser_status)
 
 @app.route('/start/<app_name>')
 def start_app(app_name):
@@ -150,11 +153,38 @@ def start_app(app_name):
             update_webui_user_sh(app_name, app_configs)
 
         command = app_configs[app_name]['command']
+
+        # bkohya enhancements
+        if app_name == 'bkohya':
+            # the --noverify flag currently is NOT supported anymore, need to check, in the meantime disable it
+            # if DEBUG_SETTINGS['bkohya_noverify']:
+            #     # Use regex to search & replace command variable to launch bkohya
+            #     #command = re.sub(r'kohya_gui.py', 'kohya_gui.py --noverify', command)
+            #     print(f"launch bkohya with patched command '{command}'")
+
+            if DEBUG_SETTINGS['bkohya_run_tensorboard']: # default == True
+                # auto-launch tensorboard together with bkohya app
+                app_config = app_configs.get(app_name) # get bkohya app_config
+                app_path = app_config['app_path']
+                cmd_key = 'run-tensorboard' # read the tensorboard launch command from the 'run-tensorboard' cmd_key
+                
+                ### run_app() variant, but need to define as app
+                # tensorboard_command = app_config['bash_cmds'][cmd_key] # get the bash_cmd value from app_config
+                # message = f"Launch Tensorboard together with kohya_ss: cmd_key='{cmd_key}' ..."
+                # print(message)
+                # app_name = 'tensorboard'
+                # threading.Thread(target=run_app, args=(app_name, tensorboard_command, running_processes)).start()
+
+                ### run_bash_cmd() variant
+                #run_bash_cmd(app_config, app_path, cmd_key=cmd_key)
+                threading.Thread(target=run_bash_cmd, args=(app_config, app_path, cmd_key)).start()
+
+
         threading.Thread(target=run_app, args=(app_name, command, running_processes)).start()
         return jsonify({'status': 'started'})
     return jsonify({'status': 'already_running'})
 
-@app.route('/stop/<app_name>')
+@app.route('/stop/<app_name>', methods=['GET'])
 def stop_app(app_name):
     if app_name in running_processes and get_app_status(app_name, running_processes) == 'running':
         try:
@@ -206,10 +236,11 @@ def kill_all():
             if get_app_status(app_key, running_processes) == 'running':
                 stop_app(app_key)
         return jsonify({'status': 'success'})
+    
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
-@app.route('/force_kill/<app_name>', methods=['POST'])
+@app.route('/force_kill/<app_name>', methods=['GET'])
 def force_kill_app(app_name):
     try:
         success, message = force_kill_process_by_name(app_name, app_configs)
@@ -217,8 +248,90 @@ def force_kill_app(app_name):
             return jsonify({'status': 'killed', 'message': message})
         else:
             return jsonify({'status': 'error', 'message': message})
+        
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/force_kill_by_port/<port>', methods=['GET'])
+def force_kill_by_port_route(port:int):
+    try:
+        success = find_and_kill_process_by_port(port)
+        message = ''
+        if success:
+            return jsonify({'status': 'killed', 'message': message})
+        else:
+            return jsonify({'status': 'error', 'message': message})
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+
+# lutzapps - added check app feature
+
+@app.route('/delete_app/<app_name>', methods=['GET'])
+def delete_app_installation_route(app_name:str):
+    try:
+        def progress_callback(message_type:str, message_data:str):
+            try:
+                send_websocket_message(message_type, message_data)
+                print(message_data) # additionally print to output
+            except Exception as e:
+                print(f"Error sending progress update: {str(e)}")
+                # Continue even if websocket fails
+                pass
+
+        success, message = delete_app_installation(app_name, app_configs, progress_callback)
+        if success:
+            return jsonify({'status': 'deleted', 'message': message})
+        else:
+            return jsonify({'status': 'error', 'message': message})
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/check_installation/<app_name>', methods=['GET'])
+def check_app_installation_route(app_name:str):
+    try:
+        def progress_callback(message_type, message_data):
+            try:
+                send_websocket_message(message_type, message_data)
+                print(message_data) # additionally print to output                
+            except Exception as e:
+                print(f"Error sending progress update: {str(e)}")
+                # Continue even if websocket fails
+                pass
+
+        success, message = check_app_installation(app_name, app_configs, progress_callback)
+        if success:
+            return jsonify({'status': 'checked', 'message': message})
+        else:
+            return jsonify({'status': 'error', 'message': message})
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+# lutzapps - added refresh app feature
+@app.route('/refresh_installation/<app_name>', methods=['GET'])
+def refresh_app_installation_route(app_name:str):
+    try:
+        def progress_callback(message_type, message_data):
+            try:
+                send_websocket_message(message_type, message_data)
+                print(message_data) # additionally print to output                
+            except Exception as e:
+                print(f"Error sending progress update: {str(e)}")
+                # Continue even if websocket fails
+                pass
+
+        success, message = refresh_app_installation(app_name, app_configs, progress_callback)
+        if success:
+            return jsonify({'status': 'refreshed', 'message': message})
+        else:
+            return jsonify({'status': 'error', 'message': message})
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
 
 from gevent.lock import RLock
 websocket_lock = RLock()
@@ -272,8 +385,24 @@ def send_heartbeat():
 # Start heartbeat thread
 threading.Thread(target=send_heartbeat, daemon=True).start()
 
-@app.route('/install/<app_name>', methods=['POST'])
-def install_app_route(app_name):
+
+@app.route('/available_venvs/<app_name>', methods=['GET'])
+def available_venvs_route(app_name):
+    try:
+        success, venvs = get_available_venvs(app_name)
+        if success:
+            return jsonify({'status': 'success', 'available_venvs': venvs})
+        else:
+            return jsonify({'status': 'error', 'error': venvs})
+
+    except Exception as e:
+        error_message = f"Error for {app_name}: {str(e)}\n{traceback.format_exc()}"
+        app.logger.error(error_message)
+        return jsonify({'status': 'error', 'message': error_message}), 500
+
+# lutzapps - added venv_version
+@app.route('/install/<app_name>/<venv_version>', methods=['GET'])
+def install_app_route(app_name, venv_version):
     try:
         def progress_callback(message_type, message_data):
             try:
@@ -283,19 +412,20 @@ def install_app_route(app_name):
                 # Continue even if websocket fails
                 pass
 
-        success, message = install_app(app_name, app_configs, progress_callback)
+        success, message = install_app(app_name, venv_version, progress_callback)
         if success:
             return jsonify({'status': 'success', 'message': message})
         else:
             return jsonify({'status': 'error', 'message': message})
+        
     except Exception as e:
         error_message = f"Installation error for {app_name}: {str(e)}\n{traceback.format_exc()}"
         app.logger.error(error_message)
         return jsonify({'status': 'error', 'message': error_message}), 500
 
-@app.route('/fix_custom_nodes/<app_name>', methods=['POST'])
+@app.route('/fix_custom_nodes/<app_name>', methods=['GET'])
 def fix_custom_nodes_route(app_name):
-    success, message = fix_custom_nodes(app_name)
+    success, message = fix_custom_nodes(app_name, app_configs)
     if success:
         return jsonify({'status': 'success', 'message': message})
     else:
@@ -395,17 +525,17 @@ def start_symlink_update_thread():
     thread.start()
 
 # modified function
-@app.route('/recreate_symlinks', methods=['POST'])
+@app.route('/recreate_symlinks', methods=['GET'])
 def recreate_symlinks_route():
-    # lutzapps - CHANGE #7 - use the new "shared_models" module for app model sharing
+    # lutzapps - use the new "shared_models" module for app model sharing
     jsonResult = update_model_symlinks()
 
     return jsonResult
 
 # modified function
-@app.route('/create_shared_folders', methods=['POST'])
+@app.route('/create_shared_folders', methods=['GET'])
 def create_shared_folders():
-    # lutzapps - CHANGE #8 - use the new "shared_models" module for app model sharing
+    # lutzapps - use the new "shared_models" module for app model sharing
     jsonResult = ensure_shared_models_folders()
     return jsonResult
 
@@ -414,7 +544,7 @@ def save_civitai_token(token):
         json.dump({'token': token}, f)
 
 # lutzapps - added function - 'HF_TOKEN' ENV var
-def load_huggingface_token():
+def load_huggingface_token()->str:
     # look FIRST for Huggingface token passed in as 'HF_TOKEN' ENV var
     HF_TOKEN = os.environ.get('HF_TOKEN', '')
     
@@ -441,7 +571,7 @@ def load_huggingface_token():
     return None
 
 # lutzapps - modified function - support 'CIVITAI_API_TOKEN' ENV var
-def load_civitai_token():
+def load_civitai_token()->str:
     # look FIRST for CivitAI token passed in as 'CIVITAI_API_TOKEN' ENV var
     CIVITAI_API_TOKEN = os.environ.get('CIVITAI_API_TOKEN', '')
     
@@ -517,32 +647,33 @@ def get_model_types_route():
 
 @app.route('/download_model', methods=['POST'])
 def download_model_route():
+    # this function will be called first from the model downloader, which only paasses the url,
+    # but did not parse for already existing version_id or file_index
+    # if we ignore the already wanted version_id, the user will end up with the model-picker dialog
+    # just to select the wanted version_id again, and then the model-picker calls also into this function,
+    # but now with a non-blank version_id
+
     try:
         data = request.json
         url = data.get('url')
         model_name = data.get('model_name')
         model_type = data.get('model_type')
-        civitai_token = data.get('civitai_token')
-        hf_token = data.get('hf_token')
+        civitai_token = data.get('civitai_token') or load_civitai_token() # If no token provided in request, try to read from ENV and last from file
+        hf_token = data.get('hf_token') or load_huggingface_token() # If no token provided in request, try to read from ENV and last from file
         version_id = data.get('version_id')
         file_index = data.get('file_index')
 
-        # If no token provided in request, try to read from file
-        if not civitai_token:
-            try:
-                if os.path.exists('/workspace/.civitai_token'):
-                    with open('/workspace/.civitai_token', 'r') as f:
-                        token_data = json.load(f)
-                        civitai_token = token_data.get('token')
-            except Exception as e:
-                app.logger.error(f"Error reading token file: {str(e)}")
+        is_civitai, _, url_model_id, url_version_id = check_civitai_url(url)
+        if version_id == None: # model-picker dialog not used already
+            version_id = url_version_id # get a possible version_id from the copy-pasted url
 
-        is_civitai, _, _, _ = check_civitai_url(url)
         is_huggingface, _, _, _, _ = check_huggingface_url(url)
 
+        # only CivitAI or Huggingface model downloads are supported for now
         if not (is_civitai or is_huggingface):
             return jsonify({'status': 'error', 'message': 'Unsupported URL. Please use Civitai or Hugging Face URLs.'}), 400
 
+        # CivitAI downloads require an API Token needed (e.g. for model variant downloads and private models)
         if is_civitai and not civitai_token:
             return jsonify({'status': 'error', 'message': 'Civitai token is required for downloading from Civitai.'}), 400
 

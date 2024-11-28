@@ -30,6 +30,10 @@ services:
       # if you NOT want need this behaviour, then set `LOCAL_DEBUG=False` [default],
       # which is the same as NOT setting this ENV var at all.
 
+      - PYTHONDONTWRITEBYTECODE=1
+      # keep Python from generating .pyc files in the container
+      # this should however be removed for production as it disables bytecode caching
+
       - FLASK_APP=app/app.py
 
       - FLASK_ENV=development # changed from "production" [default],
@@ -38,6 +42,9 @@ services:
       - GEVENT_SUPPORT=True # gevent monkey-patching is being used, enable gevent support in the debugger,
       # only needed when "LOCAL_DEBUG=True", otherwise this ENV var can be obmitted
       
+      - GIT_PYTHON_TRACE=full # enables full logging for the GitPython code, used for cloning the apps,
+      # bcomfy custom_nodes, and refreshing the apps via git fetch/merge = git pull
+
       #- "FLASK_DEBUG": "0"  # "1" allows debugging in Chrome, but then VSCode debugger not works, "0" is the [default], which is the same as NOT setting this ENV var at all
     volumes:
       - ./app:/app:rw

@@ -2,6 +2,16 @@ TESTDATA AND EXPLANATION OF MAPPING EVERYTHING YOU WANT
 
 In the folder "/app/tests" you find the following files:
 
+    $ tree /app/tests
+    /app/tests
+    |-- README-SHARED_MODELS.txt
+    |-- populate_testdata.sh
+    |-- testdata_installed_apps_pull.tar.gz
+    |-- testdata_shared_models_link.tar.gz
+    `-- testdata_stable-diffusion-webui_pull.tar.gz
+
+    1 directory, 5 files
+
 /app/tests/
 
     - "README-SHARED_MODELS.txt" (this file)
@@ -15,16 +25,15 @@ In the folder "/app/tests" you find the following files:
 
 CREATE TESTDATA (once done already):
 
-cd /workspace
-
 # For Testcase #1 - create testdata in "shared_models" folder with dummy models for most model_types:
-$ tar -czf testdata_shared_models_link.tar.gz shared_models
+$ tar -czf /app/tests/testdata_shared_models_link.tar.gz /workspace/shared_models
 
 # For Testcase #2 - create testdata with SD-Models for A1111 to be pulled back into "shared_models" and linked back:
-$ tar -czf testdata_stable-diffusion-webui_pull.tar.gz stable-diffusion-webui
+$ tar -czf /app/tests/testdata_stable-diffusion-webui_pull.tar.gz /workspace/stable-diffusion-webui
 
-# For Testcase #3 -create testdata with all possible "Apps" installed into your "/workspace"
-$ tar -czf /app/tests/testdata_installed_apps_pull.tar.gz Apps
+# For Testcase #3 - create testdata with all possible "Apps" installed into your "/workspace"
+$ cd /workspace
+$ tar -cvf - . | gzip -9 - | pv > /app/tests/testdata_installed_apps_pull.tar.gz
 
 
 USE TESTDATA:
@@ -34,69 +43,69 @@ USE TESTDATA:
 /app/tests/populate_testdata.sh::
 
 # use these 3 test cases and extract/merge them accordingly into your workspace, bur READ before you mess you up too much!!
-tar -xzf /app/tests/testdata_shared_models_link.tar.gz /workspace
-tar -xzf /app/tests/testdata_stable-diffusion-webui_pull.tar.gz /workspace
-tar -xzf /app/tests/testdata_installed_apps_pull.tar.gz /workspace
+
+tar -xzf /app/tests/testdata_shared_models_link.tar.gz -C /workspace
+tar -xzf /app/tests/testdata_stable-diffusion-webui_pull.tar.gz -C /workspace
+tar -xzf /app/tests/testdata_installed_apps_pull.tar.gz -C /workspace
 
 
 Testcase #1:
 
-When you expand "./testdata_shared_models_link.tar.gz" into the "/workspace" folder, you get:
+When you extract "./testdata_shared_models_link.tar.gz" into the "/workspace" folder, you get the folder "shared_models" installed. This is our "shared models" central location to share all types of models accross apps. 
 
 $ tree shared_models
 
 shared_models
-├── LLM
-│   └── Meta-Llama-3.1-8B
-│       ├── llm-Llama-modelfile1.txt
-│       ├── llm-Llama-modelfile2.txt
-│       └── llm-Llama-modelfile3.txt
-├── ckpt
-│   ├── ckpt-model1.txt
-│   └── ckpt-model2.txt
-├── clip
-│   └── clip-model1.txt
-├── controlnet
-│   └── controlnet-model1.txt
-├── embeddings
-│   ├── embedding-model1.txt
-│   └── embedding-model2.txt
-├── hypernetworks
-│   └── hypernetworks-model1.txt
-├── insightface
-│   └── insightface-model1.txt
-├── ipadapters
-│   ├── ipadapter-model1.txt
-│   └── xlabs
-│       └── xlabs-ipadapter-model1.txt
-├── loras
-│   ├── flux
-│   │   └── flux-lora-model1.txt
-│   ├── lora-SD-model1.txt
-│   ├── lora-SD-model2.txt
-│   ├── lora-SD-model3.txt
-│   ├── lora-SD-model4.txt
-│   ├── lora-SD-model5.txt
-│   ├── lora-model1.txt
-│   ├── lora-model2.txt
-│   └── xlabs
-│       └── xlabs-lora-model1.txt
-├── reactor
-│   ├── faces
-│   │   └── reactor-faces-model1.txt
-│   └── reactor-model1.txt
-├── unet
-│   ├── unet-model1.txt
-│   └── unet-model2.txt
-├── upscale_models
-│   └── esrgan-model1.txt
-├── vae
-│   └── vae-model1.txt
-└── vae-approx
-    └── vae-apporox-model1.txt
+|-- LLM
+|   `-- Meta-Llama-3.1-8B
+|       |-- llm-Llama-modelfile1.txt
+|       |-- llm-Llama-modelfile2.txt
+|       `-- llm-Llama-modelfile3.txt
+|-- ckpt
+|   |-- ckpt-model1.txt
+|   `-- ckpt-model2.txt
+|-- clip
+|   `-- clip-model1.txt
+|-- controlnet
+|   `-- controlnet-model1.txt
+|-- embeddings
+|   |-- embedding-model1.txt
+|   `-- embedding-model2.txt
+|-- hypernetworks
+|   `-- hypernetworks-model1.txt
+|-- insightface
+|   `-- insightface-model1.txt
+|-- ipadapters
+|   |-- xlabs
+|   |   `-- xlabs-ipadapter-model1.txt
+|   `-- ipadapter-model1.txt
+|-- loras
+|   |-- flux
+|   |   `-- flux-lora-model1.txt
+|   |-- xlabs
+|   |   `-- xlabs-lora-model1.txt
+|   |-- lora-SD-model1.txt
+|   |-- lora-SD-model2.txt
+|   |-- lora-SD-model3.txt
+|   |-- lora-SD-model4.txt
+|   |-- lora-SD-model5.txt
+|   |-- lora-model1.txt
+|   `-- lora-model2.txt
+|-- reactor
+|   |-- faces
+|   |   `-- reactor-faces-model1.txt
+|   `-- reactor-model1.txt
+|-- unet
+|   |-- unet-model1.txt
+|   `-- unet-model2.txt
+|-- upscale_models
+|   `-- esrgan-model1.txt
+|-- vae
+|   `-- vae-model1.txt
+`-- vae-approx
+    `-- vae-apporox-model1.txt
 
 20 directories, 29 files
-
 
 All these "*.txt" files "simulate" model files of a specific category (model type).
 When you have this test data and you click the "Recreate Symlinks" button on the "Settings" Tab, all these models will be shared with all "installed" apps, like:
@@ -104,15 +113,16 @@ When you have this test data and you click the "Recreate Symlinks" button on the
 A1111:		/workspace/stable-diffusion-webui
 Forge:		/workspace/stable-diffusion-webui-forge
 ComfyUI:	/workspace/ComfyUI
-Kohya_ss:	/workspace/Kohya_ss
+kohya_ss:	/workspace/kohya_ss
 CUSTOM1:	/workspace/joy-caption-batch
 
 To "simulate" the installed app, you just need to create one or all of these folders manually, as empty folders. Maybe try it one-by-one, like you would do "in-real-life".
 
 After there is at least ONE app installed, you can test the model sharing with the above mentioned Button "Recreate Symlinks".
+
 All of these 29 models should be shared into all "installed" apps.
 
-When you "add" a second app, also this new app will get all these models shared into its model folders, which can be differently named.
+When you "add" a second app, also this new app will get all these models shared into its local model folders, which can be a differently named  folder from the shared_models.
 
 Some model types (e.g. UNET) have a separate model folder from Checkpoints in ComfyUI, but in A1111/Forge, these 2 model types will be merged ("flattened") in one "Stable-Diffusion" model folder. See later in the third MAP shown here.
 
@@ -130,19 +140,19 @@ You can also test to delete a "shared model" in the "shared_models directory, an
 Testcase #2:
 
 In the second testdata TAR archive, you have some SD-models which simulate the installation of the model files once for ONE app, in this test case only for A1111.
-The "./testdata_stable-diffusion-webui_pull.tar.gz" is easier to handle than the one for Testcase #3, as it installs directly into the "original" App install location.
+The "./testdata_stable-diffusion-webui_pull.tar.gz" is easier to handle than the one for Testcase #3, as it installs directly into the "original" App install location of A1111 which is "/workspace/stable-diffusion-webui".
 
 $ tree stable-diffusion-webui                 
 
 stable-diffusion-webui
-├── _add
-│   ├── lora-SD-model2.txt
-│   ├── lora-SD-model3.txt
-│   ├── lora-SD-model4.txt
-│   └── lora-SD-model5.txt
-└── models
-    └── Lora
-        └── lora-SD-model1.txt
+|-- _add
+|   |-- lora-SD-model2.txt
+|   |-- lora-SD-model3.txt
+|   |-- lora-SD-model4.txt
+|   `-- lora-SD-model5.txt
+`-- models
+    `-- Lora
+        `-- lora-SD-model1.txt
 
 4 directories, 5 files
 
@@ -151,25 +161,25 @@ Testcase #3:
 
 In this test case you also have other apps installed already, but the principle is the same, just a little bit more careful folder management.
 
-The "./testdata_installed_apps_pull.tar.gz.tar.gz" extracts into an "Apps" folder.
-All folders in this extracted "Apps" folder should be copied into the "/workspace" folder, to simulate an installed A1111, Forge, ComfyUI and Kohya_ss. Make sure that at the end you NOT see the extracted "Apps" folder anymore, as you only used its SUB-FOLDERS to copy/move them into "/workspace" and replace/merge existing folder.
+The "./testdata_installed_apps_pull.tar.gz" extracts directly into the "/workspace" folder.
+It simulates an installed A1111, Forge, ComfyUI and kohya_ss, and joy-caption-batch.
+Copy/move them into "/workspace" and replace/merge existing folders.
 
-$ tree Apps
+$ tree /workspace
 
-Apps
-├── ComfyUI
-├── Kohya_ss
-├── _add
-│   ├── lora-SD-model2.txt
-│   ├── lora-SD-model3.txt
-│   ├── lora-SD-model4.txt
-│   └── lora-SD-model5.txt
-├── joy-caption-batch
-├── stable-diffusion-webui
-│   └── models
-│       └── Lora
-│           └── lora-SD-model1.txt
-└── stable-diffusion-webui-forge
+|-- ComfyUI
+|-- _add
+|   |-- lora-SD-model2.txt
+|   |-- lora-SD-model3.txt
+|   |-- lora-SD-model4.txt
+|   `-- lora-SD-model5.txt
+|-- joy-caption-batch
+|-- kohya_ss
+|-- stable-diffusion-webui
+|   `-- models
+|       `-- Lora
+|           `-- lora-SD-model1.txt
+`-- stable-diffusion-webui-forge
 
 9 directories, 5 files
 
@@ -182,11 +192,13 @@ But it will then also be shared to all other "installed" apps, like ComfyUI, For
 
 The only "mapping rule" for Kohya which is defined, is to get all "ckpt" (Checkpoint) model files and all UNET model files shared from the corresponding "shared_models" subfolders into its /models folder (see later in the 3rd MAP below).
 
-In the testdata "Apps" folder you also find an "_add" folder, with 4 more SD-Models to play around with the App Sharing/Syncing framework. Put the in any local app model folder and watch what happens to them and where they the can be seen/used from other apps. You either wait a fewMinutes to let this happen automatically (every 5 Minutes), or you press the "Recreate Symlinks" button at any time to kick this off.
+In the testdata "Apps" folder you also find an "_add" folder, with 4 more SD-Models to play around with the App Sharing/Syncing framework. Put them in any local app model folder and watch what happens to them and where they can be seen/used from other apps. You either wait a few Minutes to let this happen automatically (every 5 Minutes), or you press the "Recreate Symlinks" button at any time to kick this off.
 
 You can also test to see what happens, when you DELETE a model file from the shared_models sub-folders, and that all its symlinks shared to all apps will also automatically be removed, so no broken links will be left behind.
 
 When you delete a symlink in an app model folder, only the local app "looses" the model (it is just only a link to the original shared model), so no worries here. Such locally removed symlinks however will be re-created again automatically.
+
+YOu can merge this with Testcase #1
 
 
 BUT THAT IS ONLY THE BEGINNING.
@@ -238,13 +250,13 @@ IMPORTANT: Also be aware that when you add or change/rename folder names here, y
     "A1111": "/workspace/stable-diffusion-webui",
     "Forge": "/workspace/stable-diffusion-webui-forge",
     "ComfyUI": "/workspace/ComfyUI",
-    "Kohya_ss": "/workspace/Kohya_ss",
+    "kohya_ss": "/workspace/kohya_ss",
     "CUSTOM1": "/workspace/joy-caption-batch"
 }
 
 This is the "APP_INSTALL_DIRS" map for the app install dirs within the "/workspace", and as you see, it also supports "CUSTOM" apps to be installed and participating at the model sharing.
 
-This dictionary is "synced" with the main apps "app_configs" dictionary, so the installation folders are the same, and this should NOT be changed. What you can change in this MAP is to add "CUSTOM" apps, like "CUSTOM1" here e.g. to re-use the Llama LLM model which is centrally installed in "shared_models" under the LLM folder to be "shared" between ComfyUI and "Joy Caption Batch" tool, which is nice to generate your "Caption" files for your LoRA Training files with "Kohya_ss" for example.
+This dictionary is "synced" with the main apps "app_configs" dictionary, so the installation folders are the same, and this should NOT be changed. What you can change in this MAP is to add "CUSTOM" apps, like "CUSTOM1" here e.g. to re-use the Llama LLM model which is centrally installed in "shared_models" under the LLM folder to be "shared" between ComfyUI and "Joy Caption Batch" tool, which is nice to generate your "Caption" files for your LoRA Training files with "kohya_ss" for example.
 
 
 3.) The "SHARED_MODEL_APP_MAP" map found as "SHARED_MODEL_APP_MAP_FILE"
@@ -255,7 +267,7 @@ This dictionary is "synced" with the main apps "app_configs" dictionary, so the 
         "ComfyUI": "/models/checkpoints",
         "A1111": "/models/Stable-diffusion",
         "Forge": "/models/Stable-diffusion",
-        "Kohya_ss": "/models" # flatten all "ckpt" / "unet" models here
+        "kohya_ss": "/models" # flatten all "ckpt" / "unet" models here
     },
 
     "clip": {
@@ -342,7 +354,7 @@ This dictionary is "synced" with the main apps "app_configs" dictionary, so the 
         "ComfyUI": "/models/unet",
         "A1111": "/models/Stable-diffusion", # flatten all "ckpts" / "unet" models here
         "Forge": "/models/Stable-diffusion", # flatten all "ckpts" / "unet" models here
-        "Kohya_ss": "/models" # flatten all "ckpt" / "unet" models here
+        "kohya_ss": "/models" # flatten all "ckpt" / "unet" models here
     },
 
     "upscale_models": {
@@ -395,7 +407,7 @@ FOLDER SHARING, e.g. LLM folder-based models:
 _app_install.dirs.json:
 {
     ...
-    "Kohya_ss": "/workspace/Kohya_ss",
+    "kohya_ss": "/workspace/kohya_ss",
     "CUSTOM1": "/workspace/joy-caption-batch"
 }
 
